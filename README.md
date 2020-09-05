@@ -1,1 +1,1 @@
-## Repository for the Formal Language Theory course
+### Formal Language Theory Course assignments
