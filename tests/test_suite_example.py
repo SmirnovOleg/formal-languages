@@ -11,11 +11,11 @@ def create_matrix_from_array(array):
 
 
 def test_matrix_product():
-    a = create_matrix_from_array([[1, 1], [1, 1]])
-    b = create_matrix_from_array([[2, 2], [2, 2]])
-    matrix_actual = a @ b
-    matrix_expected = create_matrix_from_array([[4, 4], [4, 4]])
-    assert matrix_expected.iseq(matrix_actual)
+    A = create_matrix_from_array([[1, 1], [1, 1]])
+    B = create_matrix_from_array([[2, 2], [2, 2]])
+    actual_matrix_product = A @ B
+    expected_matrix = create_matrix_from_array([[4, 4], [4, 4]])
+    assert expected_matrix.iseq(actual_matrix_product)
 
 
 def test_pda_intersection():
