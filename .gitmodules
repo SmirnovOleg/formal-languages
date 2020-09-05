@@ -1,0 +1,3 @@
+[submodule "external/pygraphblas"]
+	path = external/pygraphblas
+	url = https://github.com/michelp/pygraphblas.git
