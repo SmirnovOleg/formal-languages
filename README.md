@@ -1,1 +1,1 @@
-# Repository for the Formal Language Theory course
+## Repository for the Formal Language Theory course
