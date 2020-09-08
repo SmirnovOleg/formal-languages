@@ -1,6 +1,7 @@
 ### Formal Language Theory Course assignments
 
 [![Build Status](https://travis-ci.com/SmirnovOleg/formal-languages.svg?branch=master)](https://travis-ci.com/SmirnovOleg/formal-languages)
+[![Build Status](https://travis-ci.com/SmirnovOleg/formal-languages.svg?branch=task_01)](https://travis-ci.com/SmirnovOleg/formal-languages)
 
 #### Installation & Running tests
 
