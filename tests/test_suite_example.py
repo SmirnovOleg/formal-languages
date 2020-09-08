@@ -14,7 +14,7 @@ def test_matrix_product():
     A = create_matrix_from_array([[1, 1], [1, 1]])
     B = create_matrix_from_array([[2, 2], [2, 2]])
     actual_matrix_product = A @ B
-    expected_matrix = create_matrix_from_array([[4, 3], [4, 4]])
+    expected_matrix = create_matrix_from_array([[4, 4], [4, 4]])
     assert expected_matrix.iseq(actual_matrix_product)
 
 
