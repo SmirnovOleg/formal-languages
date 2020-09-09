@@ -1,0 +1,4 @@
+services: docker
+script:
+  - docker build -t formal_languages .
+  - docker run formal_languages
