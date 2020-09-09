@@ -5,8 +5,7 @@
 
 #### Installation & Running tests
 
- - All you need to run the tests is Docker:
-   - `git clone https://github.com/SmirnovOleg/formal-languages.git`
-   - `cd formal_languages`
-   - `docker build -t formal_languages .`
-   - `docker run formal_languages`
+ - `git clone https://github.com/SmirnovOleg/formal-languages.git`
+ - `cd formal_languages`
+ - `docker build -t formal_languages .`
+ - `docker run formal_languages`
