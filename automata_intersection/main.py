@@ -1,7 +1,9 @@
 import argparse
 import json
+from collections import Counter
 from dataclasses import dataclass
-from typing import Tuple, Dict, List
+from itertools import chain
+from typing import Tuple, Dict, List, Optional, Set
 
 from pyformlang.finite_automaton import EpsilonNFA, DeterministicFiniteAutomaton, State
 from pyformlang.regular_expression import Regex
@@ -12,7 +14,7 @@ from pygraphblas import types
 Indices = List[int]
 
 
-@dataclass
+@dataclass(eq=True, frozen=True)
 class Edge:
     node_from: int
     node_to: int
@@ -58,6 +60,28 @@ class GraphWrapper:
         instance.label_to_bool_matrix = label_to_bool_matrix
         return instance
 
+    @property
+    def vertices_num(self):
+        return max([max(matrix.ncols, matrix.nrows) for matrix in self.label_to_bool_matrix.values()])
+
+    def collect_paths(self, start_indices: Set[int], end_indices: Set[int]):
+        edge_labels_counter = Counter()
+        for start_index in start_indices:
+            used = [False] * self.vertices_num
+            result = []
+            self.__dfs(start_index, used, end_indices, result)
+            edge_labels_counter.update(Counter([edge.label for edge in result]))
+        return edge_labels_counter
+
+    def __dfs(self, start_index: int, used: List[bool], end_indices: Set[int], result: List[Edge]):
+        used[start_index] = True
+        for label, matrix in self.label_to_bool_matrix.items():
+            if start_index < matrix.nrows:
+                for to_index, _ in matrix[start_index]:
+                    result.append(Edge(start_index, to_index, label))
+                    if not used[to_index]:
+                        self.__dfs(to_index, used, end_indices, result)
+
 
 class AutomatonGraphWrapper(GraphWrapper):
     dfa: DeterministicFiniteAutomaton
@@ -86,11 +110,11 @@ class AutomatonGraphWrapper(GraphWrapper):
         return GraphWrapper._from_label_to_bool_matrix(label_to_kronecker_product)
 
     @property
-    def final_states_indices(self):
+    def final_states_indices(self) -> List[int]:
         return [self.dfa_state_to_idx[state] for state in self.dfa.final_states]
 
     @property
-    def start_states_indices(self):
+    def start_states_indices(self) -> List[int]:
         return [self.dfa_state_to_idx[state] for state in self.dfa.start_states]
 
 
@@ -112,6 +136,15 @@ def main():
     with open(args.path_to_query, 'r') as file:
         query = json.load(file)
     result = constraint.kronecker_product(graph)
+    if query.get('reachability_between_all'):
+        row_step = graph.vertices_num
+        constraint_start_idxs = constraint.start_states_indices
+        final_start_idxs = set(chain(*map(
+            lambda idx: [idx * row_step + i for i in range(row_step)],
+            constraint_start_idxs
+        )))
+        final_end_idxs = set(range(result.vertices_num))
+        print(result.collect_paths(final_start_idxs, final_end_idxs))
 
 
 if __name__ == '__main__':
