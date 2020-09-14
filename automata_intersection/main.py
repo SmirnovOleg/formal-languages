@@ -78,7 +78,7 @@ class GraphWrapper:
         for label, matrix in self.label_to_bool_matrix.items():
             if start_index < matrix.nrows:
                 for to_index, _ in matrix[start_index]:
-                    result.append(Edge(start_index, to_index, label))
+                    result.append(Edge(start_index, to_index, str(label)))
                     if not used[to_index]:
                         self.__dfs(to_index, used, end_indices, result)
 
@@ -136,15 +136,23 @@ def main():
     with open(args.path_to_query, 'r') as file:
         query = json.load(file)
     result = constraint.kronecker_product(graph)
+
+    constraint_start_idxs = constraint.start_states_indices
+    step = graph.vertices_num
+    all_start_idxs = set(chain(*map(
+        lambda idx: [idx * step + i for i in range(step)],
+        constraint_start_idxs
+    )))
+    all_end_idxs = set(range(result.vertices_num))
+
     if query.get('reachability_between_all'):
-        row_step = graph.vertices_num
-        constraint_start_idxs = constraint.start_states_indices
-        final_start_idxs = set(chain(*map(
-            lambda idx: [idx * row_step + i for i in range(row_step)],
-            constraint_start_idxs
-        )))
-        final_end_idxs = set(range(result.vertices_num))
-        print(result.collect_paths(final_start_idxs, final_end_idxs))
+        edge_labels_counter = result.collect_paths(all_start_idxs, all_end_idxs)
+        print(json.dumps(edge_labels_counter))
+    elif "reachability_from_set" in query:
+        graph_start_idxs = set(query.get("reachability_from_set"))
+        start_idxs = set([idx for idx in all_start_idxs if (idx % step) in graph_start_idxs])
+        edge_labels_counter = result.collect_paths(start_idxs, all_end_idxs)
+        print(json.dumps(edge_labels_counter))
 
 
 if __name__ == '__main__':
