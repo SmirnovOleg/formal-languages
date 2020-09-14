@@ -1,13 +1,12 @@
 import argparse
 import json
-from collections import Counter
 from dataclasses import dataclass
 from itertools import chain
-from typing import Tuple, Dict, List, Optional, Set
+from typing import Tuple, Dict, List, Set
 
 from pyformlang.finite_automaton import EpsilonNFA, DeterministicFiniteAutomaton, State
 from pyformlang.regular_expression import Regex
-from pygraphblas import Matrix
+from pygraphblas import Matrix, semiring, Accum
 from pygraphblas import binaryop
 from pygraphblas import types
 
@@ -64,23 +63,29 @@ class GraphWrapper:
     def vertices_num(self):
         return max([max(matrix.ncols, matrix.nrows) for matrix in self.label_to_bool_matrix.values()])
 
-    def collect_paths(self, start_indices: Set[int], end_indices: Set[int]):
-        edge_labels_counter = Counter()
-        for start_index in start_indices:
-            used = [False] * self.vertices_num
-            result = []
-            self.__dfs(start_index, used, end_indices, result)
-            edge_labels_counter.update(Counter([edge.label for edge in result]))
-        return edge_labels_counter
+    @property
+    def edges_counter(self):
+        return {label: matrix.nvals for label, matrix in self.label_to_bool_matrix.items()}
 
-    def __dfs(self, start_index: int, used: List[bool], end_indices: Set[int], result: List[Edge]):
-        used[start_index] = True
-        for label, matrix in self.label_to_bool_matrix.items():
-            if start_index < matrix.nrows:
-                for to_index, _ in matrix[start_index]:
-                    result.append(Edge(start_index, to_index, str(label)))
-                    if not used[to_index]:
-                        self.__dfs(to_index, used, end_indices, result)
+    def get_reachability_matrix(self) -> Matrix:
+        adj_matrix = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
+        for _, matrix in self.label_to_bool_matrix.items():
+            matrix.resize(nrows=self.vertices_num, ncols=self.vertices_num)
+            adj_matrix = adj_matrix.eadd(matrix, add_op=binaryop.LOR)
+        with semiring.LOR_LAND_BOOL, Accum(binaryop.LOR):
+            reachability_matrix = Matrix.identity(types.BOOL, nrows=self.vertices_num)
+            for i in range(self.vertices_num):
+                reachability_matrix @= adj_matrix
+        return reachability_matrix
+
+    def get_reachable_pairs(self, start_indices: Set[int], end_indices: Set[int]):
+        reachability_matrix = self.get_reachability_matrix()
+        result: List[Tuple[int, int]] = []
+        for start_index in start_indices:
+            for end_index in end_indices:
+                if reachability_matrix.get(start_index, end_index, False):
+                    result.append((start_index, end_index))
+        return result
 
 
 class AutomatonGraphWrapper(GraphWrapper):
@@ -146,13 +151,22 @@ def main():
     all_end_idxs = set(range(result.vertices_num))
 
     if query.get('reachability_between_all'):
-        edge_labels_counter = result.collect_paths(all_start_idxs, all_end_idxs)
-        print(json.dumps(edge_labels_counter))
-    elif "reachability_from_set" in query:
+        start_idxs, end_idxs = all_start_idxs, all_end_idxs
+    elif "reachability_from_set" in query and "reachability_to_set" not in query:
         graph_start_idxs = set(query.get("reachability_from_set"))
         start_idxs = set([idx for idx in all_start_idxs if (idx % step) in graph_start_idxs])
-        edge_labels_counter = result.collect_paths(start_idxs, all_end_idxs)
-        print(json.dumps(edge_labels_counter))
+        end_idxs = all_end_idxs
+    elif "reachability_from_set" in query and "reachability_to_set" in query:
+        graph_start_idxs = set(query.get("reachability_from_set"))
+        graph_end_idxs = set(query.get("reachability_to_set"))
+        start_idxs = set([idx for idx in all_start_idxs if (idx % step) in graph_start_idxs])
+        end_idxs = set([idx for idx in all_end_idxs if (idx % step) in graph_end_idxs])
+    else:
+        raise KeyError("Incorrect format of the input query")
+
+    reachable_pairs = result.get_reachable_pairs(start_idxs, end_idxs)
+    initial_reachable_pairs = set([(pair[0] % step, pair[1] % step) for pair in reachable_pairs])
+    print(initial_reachable_pairs)
 
 
 if __name__ == '__main__':
