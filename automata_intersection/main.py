@@ -10,13 +10,15 @@ def solve_RPQ_problem(graph: GraphWrapper, constraint: AutomatonGraphWrapper,
                       query: Dict[str, Union[bool, List[int]]]) -> Set[Tuple[int, int]]:
     # Calculate kronecker (tensor) product, prepare indices
     result = constraint.kronecker_product(graph)
-    constraint_start_idxs = constraint.start_states_indices
     step = graph.vertices_num
     all_start_idxs = set(chain(*map(
         lambda idx: [idx * step + i for i in range(step)],
-        constraint_start_idxs
+        constraint.start_states_indices
     )))
-    all_end_idxs = set(range(result.vertices_num))
+    all_end_idxs = set(chain(*map(
+        lambda idx: [idx * step + i for i in range(step)],
+        constraint.final_states_indices
+    )))
 
     # Parse query from JSON
     if query.get('reachability_between_all'):
