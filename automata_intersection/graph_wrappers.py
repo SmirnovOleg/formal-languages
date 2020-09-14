@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Tuple, Dict, List, Set
 
 from pyformlang.finite_automaton import EpsilonNFA, DeterministicFiniteAutomaton, State
+from pyformlang.regular_expression import Regex
 from pygraphblas import Matrix, semiring, Accum
 from pygraphblas import binaryop
 from pygraphblas import types
@@ -40,8 +41,8 @@ class GraphWrapper:
 
     @classmethod
     def from_file(cls, path_to_file: str):
+        edges = []
         with open(path_to_file, 'r') as input_file:
-            edges = []
             for line in input_file.readlines():
                 vertex_from, label, vertex_to = line.split(' ')
                 edges.append(Edge(node_from=int(vertex_from),
@@ -98,6 +99,13 @@ class AutomatonGraphWrapper(GraphWrapper):
         self.dfa = dfa
         self.dfa_state_to_idx = state_to_idx
         super().__init__(edges)
+
+    @classmethod
+    def from_regex_file(cls, path_to_regex_file: str):
+        with open(path_to_regex_file, 'r') as file:
+            line = file.readline()
+            regex_epsilon_nfa = Regex(regex=line).to_epsilon_nfa()
+        return AutomatonGraphWrapper(regex_epsilon_nfa)
 
     def kronecker_product(self, other: GraphWrapper) -> GraphWrapper:
         label_to_kronecker_product: Dict[str, Matrix] = {}

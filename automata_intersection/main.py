@@ -1,33 +1,13 @@
 import argparse
 import json
 from itertools import chain
-
-from pyformlang.regular_expression import Regex
+from typing import Set, Tuple, Dict, Union, List
 
 from automata_intersection.graph_wrappers import GraphWrapper, AutomatonGraphWrapper
 
 
-def main():
-    # Parse command line arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument("path_to_graph",
-                        help="input file with list of edges of the graph in format 'v_from label v_to'")
-    parser.add_argument("path_to_regex",
-                        help="input file with corresponding regex (see `pyformlang.regular_expression.Regex`)")
-    parser.add_argument("path_to_query",
-                        help="input file with specified set of vertices in the input graph "
-                             "using regex for finding reachability")
-    args = parser.parse_args()
-
-    # Load initial data: graph, regexp, query
-    graph = GraphWrapper.from_file(args.path_to_graph)
-    with open(args.path_to_regex, 'r') as file:
-        line = file.readline()
-        regex_epsilon_nfa = Regex(regex=line).to_epsilon_nfa()
-        constraint = AutomatonGraphWrapper(regex_epsilon_nfa)
-    with open(args.path_to_query, 'r') as file:
-        query = json.load(file)
-
+def solve_RPQ_problem(graph: GraphWrapper, constraint: AutomatonGraphWrapper,
+                      query: Dict[str, Union[bool, List[int]]]) -> Set[Tuple[int, int]]:
     # Calculate kronecker (tensor) product, prepare indices
     result = constraint.kronecker_product(graph)
     constraint_start_idxs = constraint.start_states_indices
@@ -53,11 +33,39 @@ def main():
     else:
         raise KeyError("Incorrect format of the input query")
 
-    # Output reachable pairs from resulting automaton
+    # Collect reachable pairs from resulting automaton using transitive closure
     reachable_pairs = result.get_reachable_pairs(start_idxs, end_idxs)
     initial_reachable_pairs = set([(pair[0] % step, pair[1] % step) for pair in reachable_pairs])
+
+    return initial_reachable_pairs
+
+
+def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("path_to_graph",
+                        help="input file with list of edges of the graph in format 'v_from label v_to'")
+    parser.add_argument("path_to_regex",
+                        help="input file with corresponding regex (see `pyformlang.regular_expression.Regex`)")
+    parser.add_argument("path_to_query",
+                        help="input file with specified set of vertices in the input graph "
+                             "using regex for finding reachability")
+    args = parser.parse_args()
+
+    # Load initial data: graph, regexp, query
+    graph = GraphWrapper.from_file(args.path_to_graph)
+    constraint = AutomatonGraphWrapper.from_regex_file(args.path_to_regex)
+    with open(args.path_to_query, 'r') as file:
+        query = json.load(file)
+
+    initial_reachable_pairs = solve_RPQ_problem(graph, constraint, query)
+    print("Reachable pairs of indices:")
     for start_idx, end_idx in initial_reachable_pairs:
-        print(f'{start_idx} {end_idx}')
+        print(f'{start_idx} ~~> {end_idx}')
+
+    intersection = constraint.kronecker_product(graph)
+    print("Counter of edge types in resulting automaton:")
+    print(intersection.edges_counter)
 
 
 if __name__ == '__main__':
