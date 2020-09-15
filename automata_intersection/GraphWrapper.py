@@ -18,10 +18,6 @@ class Edge:
 
 
 class GraphWrapper:
-    """A class for storing graphs in the form of sparse matrices.
-
-    Each graph is represented by mapping between edge labels and sparse boolean `pygraphblas.Matrix`.
-    """
     label_to_bool_matrix: Dict[str, Matrix] = {}
     start_states: Optional[Indices]
     final_states: Optional[Indices]
@@ -64,7 +60,8 @@ class GraphWrapper:
 
     @property
     def vertices_num(self) -> int:
-        return max([max(matrix.ncols, matrix.nrows) for matrix in self.label_to_bool_matrix.values()])
+        maximums = [max(matrix.ncols, matrix.nrows) for matrix in self.label_to_bool_matrix.values()]
+        return 0 if not maximums else max(maximums)
 
     @property
     def edges_counter(self) -> Dict[Symbol, int]:
