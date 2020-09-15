@@ -1,8 +1,8 @@
 from dataclasses import dataclass
-from typing import Tuple, Dict, List, Set
+from itertools import chain
+from typing import Tuple, Dict, List, Set, Optional
 
-from pyformlang.finite_automaton import EpsilonNFA, DeterministicFiniteAutomaton, State
-from pyformlang.regular_expression import Regex
+from pyformlang.finite_automaton import State, Symbol, NondeterministicFiniteAutomaton
 from pygraphblas import Matrix, semiring, Accum
 from pygraphblas import binaryop
 from pygraphblas import types
@@ -23,8 +23,12 @@ class GraphWrapper:
     Each graph is represented by mapping between edge labels and sparse boolean `pygraphblas.Matrix`.
     """
     label_to_bool_matrix: Dict[str, Matrix] = {}
+    start_states: Optional[Indices]
+    final_states: Optional[Indices]
 
-    def __init__(self, edges: List[Edge]):
+    def __init__(self, edges: List[Edge],
+                 start_states: Optional[List[int]] = None,
+                 final_states: Optional[List[int]] = None):
         label_to_edges: Dict[str, Tuple[Indices, Indices]] = {}
         label_to_bool_matrix: Dict[str, Matrix] = {}
         for edge in edges:
@@ -34,6 +38,8 @@ class GraphWrapper:
         for label, (I, J) in label_to_edges.items():
             label_to_bool_matrix[label] = Matrix.from_lists(I, J, [1] * len(I))
         self.label_to_bool_matrix = label_to_bool_matrix
+        self.start_states = start_states
+        self.final_states = final_states
 
     @classmethod
     def from_list_of_edges(cls, edges: List[Edge]):
@@ -57,12 +63,34 @@ class GraphWrapper:
         return instance
 
     @property
-    def vertices_num(self):
+    def vertices_num(self) -> int:
         return max([max(matrix.ncols, matrix.nrows) for matrix in self.label_to_bool_matrix.values()])
 
     @property
-    def edges_counter(self):
+    def edges_counter(self) -> Dict[Symbol, int]:
         return {label: matrix.nvals for label, matrix in self.label_to_bool_matrix.items()}
+
+    def kronecker_product(self, other):
+        label_to_kronecker_product: Dict[str, Matrix] = {}
+        step = other.vertices_num
+        empty_matrix = Matrix.sparse(typ=types.INT64, nrows=step, ncols=step)
+        for label, matrix in self.label_to_bool_matrix.items():
+            other_matrix: Matrix = other.label_to_bool_matrix.get(label, empty_matrix)
+            other_matrix.resize(nrows=step, ncols=step)
+            result_matrix = matrix.kronecker(other=other_matrix, op=binaryop.TIMES)
+            label_to_kronecker_product[label] = result_matrix
+        intersection = GraphWrapper._from_label_to_bool_matrix(label_to_kronecker_product)
+        if self.start_states is not None:
+            intersection.start_states = list(set(chain(*map(
+                lambda idx: [idx * step + i for i in range(step)],
+                self.start_states
+            ))))
+        if self.final_states is not None:
+            intersection.final_states = list(set(chain(*map(
+                lambda idx: [idx * step + i for i in range(step)],
+                self.final_states
+            ))))
+        return intersection
 
     def get_reachability_matrix(self) -> Matrix:
         adj_matrix = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
@@ -84,44 +112,17 @@ class GraphWrapper:
                     result.append((start_index, end_index))
         return result
 
-
-class AutomatonGraphWrapper(GraphWrapper):
-    dfa: DeterministicFiniteAutomaton
-    dfa_state_to_idx: Dict[State, int]
-
-    def __init__(self, epsilon_nfa: EpsilonNFA):
-        edges = []
-        dfa = epsilon_nfa.to_deterministic()
-        state_to_idx = dict([(state, index) for index, state in enumerate(dfa.states)])
-        for state_from, transitions in epsilon_nfa.to_deterministic().to_dict().items():
-            for label, state_to in transitions.items():
-                edges.append(Edge(node_from=state_to_idx[state_from], node_to=state_to_idx[state_to], label=label))
-        self.dfa = dfa
-        self.dfa_state_to_idx = state_to_idx
-        super().__init__(edges)
-
-    @classmethod
-    def from_regex_file(cls, path_to_regex_file: str):
-        with open(path_to_regex_file, 'r') as file:
-            line = file.readline()
-            regex_epsilon_nfa = Regex(regex=line).to_epsilon_nfa()
-        return AutomatonGraphWrapper(regex_epsilon_nfa)
-
-    def kronecker_product(self, other: GraphWrapper) -> GraphWrapper:
-        label_to_kronecker_product: Dict[str, Matrix] = {}
-        empty_matrix = Matrix.sparse(typ=types.INT64,
-                                     nrows=len(self.label_to_bool_matrix),
-                                     ncols=len(self.label_to_bool_matrix))
+    def to_nfa(self, start_states: List[int], final_states: List[int]):
+        self.start_states = start_states
+        self.final_states = final_states
+        nfa = NondeterministicFiniteAutomaton()
+        states = [State(idx) for idx in range(self.vertices_num)]
+        symbols = {label: Symbol(label) for label in self.label_to_bool_matrix}
+        for start_idx in start_states:
+            nfa.add_start_state(states[start_idx])
+        for end_idx in final_states:
+            nfa.add_final_state(states[end_idx])
         for label, matrix in self.label_to_bool_matrix.items():
-            other_matrix = other.label_to_bool_matrix.get(label, empty_matrix)
-            result_matrix = matrix.kronecker(other=other_matrix, op=binaryop.TIMES)
-            label_to_kronecker_product[label] = result_matrix
-        return GraphWrapper._from_label_to_bool_matrix(label_to_kronecker_product)
-
-    @property
-    def final_states_indices(self) -> List[int]:
-        return [self.dfa_state_to_idx[state] for state in self.dfa.final_states]
-
-    @property
-    def start_states_indices(self) -> List[int]:
-        return [self.dfa_state_to_idx[state] for state in self.dfa.start_states]
+            for i, j, _ in zip(*matrix.to_lists()):
+                nfa.add_transition(states[i], symbols[label], states[j])
+        return nfa
