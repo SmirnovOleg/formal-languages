@@ -19,12 +19,12 @@ class Edge:
 
 class GraphWrapper:
     label_to_bool_matrix: Dict[str, Matrix] = {}
-    start_states: Optional[Indices]
-    final_states: Optional[Indices]
+    start_states: Indices
+    final_states: Indices
 
     def __init__(self, edges: List[Edge],
-                 start_states: Optional[List[int]] = None,
-                 final_states: Optional[List[int]] = None):
+                 start_states: Optional[Indices] = None,
+                 final_states: Optional[Indices] = None):
         label_to_edges: Dict[str, Tuple[Indices, Indices]] = {}
         label_to_bool_matrix: Dict[str, Matrix] = {}
         for edge in edges:
@@ -34,7 +34,11 @@ class GraphWrapper:
         for label, (I, J) in label_to_edges.items():
             label_to_bool_matrix[label] = Matrix.from_lists(I, J, [1] * len(I))
         self.label_to_bool_matrix = label_to_bool_matrix
+        if start_states is None:
+            start_states = list(range(self.vertices_num))
         self.start_states = start_states
+        if final_states is None:
+            final_states = list(range(self.vertices_num))
         self.final_states = final_states
 
     @classmethod
@@ -77,16 +81,14 @@ class GraphWrapper:
             result_matrix = matrix.kronecker(other=other_matrix, op=binaryop.TIMES)
             label_to_kronecker_product[label] = result_matrix
         intersection = GraphWrapper._from_label_to_bool_matrix(label_to_kronecker_product)
-        if self.start_states is not None:
-            intersection.start_states = list(set(chain(*map(
-                lambda idx: [idx * step + i for i in range(step)],
-                self.start_states
-            ))))
-        if self.final_states is not None:
-            intersection.final_states = list(set(chain(*map(
-                lambda idx: [idx * step + i for i in range(step)],
-                self.final_states
-            ))))
+        intersection.start_states = list(set(chain(*map(
+            lambda idx: [idx * step + i for i in range(step)],
+            self.start_states
+        ))))
+        intersection.final_states = list(set(chain(*map(
+            lambda idx: [idx * step + i for i in range(step)],
+            self.final_states
+        ))))
         return intersection
 
     def get_reachability_matrix(self) -> Matrix:
@@ -100,16 +102,16 @@ class GraphWrapper:
                 reachability_matrix += reachability_matrix @ adj_matrix
         return reachability_matrix
 
-    def get_reachable_pairs(self, start_indices: Set[int], end_indices: Set[int]):
+    def get_reachable_pairs(self, from_indices: Set[int], to_indices: Set[int]):
         reachability_matrix = self.get_reachability_matrix()
         result: List[Tuple[int, int]] = []
-        for start_index in start_indices:
-            for end_index in end_indices:
-                if reachability_matrix.get(start_index, end_index, False):
-                    result.append((start_index, end_index))
+        for from_index in from_indices:
+            for to_index in to_indices:
+                if reachability_matrix.get(from_index, to_index, False):
+                    result.append((from_index, to_index))
         return result
 
-    def to_nfa(self, start_states: List[int], final_states: List[int]):
+    def to_nfa(self, start_states: Indices, final_states: Indices):
         self.start_states = start_states
         self.final_states = final_states
         nfa = NondeterministicFiniteAutomaton()
