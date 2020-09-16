@@ -25,7 +25,7 @@ class RegexGraphWrapper(GraphWrapper):
 
     @classmethod
     def from_regex(cls, regex: str):
-        regex_epsilon_nfa = Regex(regex).to_epsilon_nfa()
+        regex_epsilon_nfa = Regex.from_python_regex(regex).to_epsilon_nfa()
         return RegexGraphWrapper(regex_epsilon_nfa)
 
     @classmethod

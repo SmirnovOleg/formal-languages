@@ -32,7 +32,7 @@ class GraphWrapper:
             I.append(edge.node_from)
             J.append(edge.node_to)
         for label, (I, J) in label_to_edges.items():
-            label_to_bool_matrix[label] = Matrix.from_lists(I, J, [1] * len(I))
+            label_to_bool_matrix[label] = Matrix.from_lists(I, J, [True] * len(I), typ=types.BOOL)
         self.label_to_bool_matrix = label_to_bool_matrix
         if start_states is None:
             start_states = list(range(self.vertices_num))
@@ -74,7 +74,7 @@ class GraphWrapper:
     def kronecker_product(self, other):
         label_to_kronecker_product: Dict[str, Matrix] = {}
         step = other.vertices_num
-        empty_matrix = Matrix.sparse(typ=types.INT64, nrows=step, ncols=step)
+        empty_matrix = Matrix.sparse(typ=types.BOOL, nrows=step, ncols=step)
         for label, matrix in self.label_to_bool_matrix.items():
             other_matrix: Matrix = other.label_to_bool_matrix.get(label, empty_matrix)
             other_matrix.resize(nrows=step, ncols=step)
@@ -92,14 +92,13 @@ class GraphWrapper:
         return intersection
 
     def get_reachability_matrix(self) -> Matrix:
-        adj_matrix = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
-        for _, matrix in self.label_to_bool_matrix.items():
-            matrix.resize(nrows=self.vertices_num, ncols=self.vertices_num)
-            adj_matrix = adj_matrix.eadd(matrix, add_op=binaryop.LOR)
+        reachability_matrix = Matrix.identity(types.BOOL, self.vertices_num)
         with semiring.LOR_LAND_BOOL:
-            reachability_matrix = Matrix.identity(types.BOOL, nrows=self.vertices_num)
-            for i in range(self.vertices_num):
-                reachability_matrix += reachability_matrix @ adj_matrix
+            for _, matrix in self.label_to_bool_matrix.items():
+                matrix.resize(nrows=self.vertices_num, ncols=self.vertices_num)
+                reachability_matrix += matrix
+            for i in range(self.vertices_num - 1):
+                reachability_matrix += reachability_matrix @ reachability_matrix
         return reachability_matrix
 
     def get_reachable_pairs(self, from_indices: Set[int], to_indices: Set[int]):

@@ -54,7 +54,7 @@ def suite(request):
 
 @pytest.fixture(scope="function", params=[
     (vertices_num, regex)
-    for regex in ['a*b*', 'a(b|c)*(c|d)', 'a', '(d|b|c)aa*']
+    for regex in ['a*b*', 'a(b|c)*(c|d)', 'a', '(a b (c? d)*)+ (e|b)*', '(d|b|c)aa*', 'ab+c?(d|a)']
     for vertices_num in [10, 50, 100, 500]
 ])
 def random_suite(request):
