@@ -94,10 +94,10 @@ class GraphWrapper:
         for _, matrix in self.label_to_bool_matrix.items():
             matrix.resize(nrows=self.vertices_num, ncols=self.vertices_num)
             adj_matrix = adj_matrix.eadd(matrix, add_op=binaryop.LOR)
-        with semiring.LOR_LAND_BOOL, Accum(binaryop.LOR):
+        with semiring.LOR_LAND_BOOL:
             reachability_matrix = Matrix.identity(types.BOOL, nrows=self.vertices_num)
             for i in range(self.vertices_num):
-                reachability_matrix @= adj_matrix
+                reachability_matrix += reachability_matrix @ adj_matrix
         return reachability_matrix
 
     def get_reachable_pairs(self, start_indices: Set[int], end_indices: Set[int]):

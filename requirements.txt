@@ -1,3 +1,2 @@
 pyformlang
 pytest
-numpy

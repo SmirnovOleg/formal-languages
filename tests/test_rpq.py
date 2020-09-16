@@ -2,7 +2,6 @@ import json
 import os
 import random
 
-import numpy as np
 import pytest
 from pyformlang.finite_automaton import FiniteAutomaton
 
@@ -93,7 +92,6 @@ def test_prepared_rpq(suite):
 def test_random_rpq(random_suite):
     graph: GraphWrapper = random_suite['graph']
     constraint: RegexGraphWrapper = random_suite['constraint']
-
     actual_intersection: GraphWrapper = constraint.kronecker_product(graph)
     for label, matrix in actual_intersection.label_to_bool_matrix.items():
         for i, j, _ in zip(*matrix.to_lists()):
