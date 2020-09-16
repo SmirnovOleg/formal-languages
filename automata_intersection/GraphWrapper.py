@@ -3,7 +3,7 @@ from itertools import chain
 from typing import Tuple, Dict, List, Set, Optional
 
 from pyformlang.finite_automaton import State, Symbol, NondeterministicFiniteAutomaton
-from pygraphblas import Matrix, semiring, Accum
+from pygraphblas import Matrix, semiring
 from pygraphblas import binaryop
 from pygraphblas import types
 
