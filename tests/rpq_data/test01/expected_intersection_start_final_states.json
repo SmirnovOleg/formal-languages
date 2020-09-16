@@ -1,0 +1,10 @@
+{
+  "start_states": [
+    0,
+    3
+  ],
+  "final_states": [
+    2,
+    5
+  ]
+}
