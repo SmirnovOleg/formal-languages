@@ -11,7 +11,7 @@ from automata_intersection import GraphWrapper, RegexGraphWrapper
 data_path = os.path.join(os.getcwd(), 'tests/.big_data/')
 graphs_test_suites = os.listdir(data_path)[0]
 csv_path = os.path.join(data_path, 'benchmark.csv')
-csv_fieldnames = ['algo', 'graph', 'regex', 'reachable_pairs', 'building_time_ms', 'inference_time_ms']
+csv_fieldnames = ['algo', 'graph', 'regex', 'reachable_pairs', 'building_time_ms']
 iterations_num = 1
 
 
@@ -68,26 +68,24 @@ def test_big_data(benchmark_suite):
             intersection = regex.kronecker_product(graph)
 
             sq_building_time, sq_closure = timeit(intersection.build_closure_by_squaring)()
-            sq_inference_time, sq_nvals = timeit(lambda: sq_closure.nvals)()
+            sq_nvals = sq_closure.nvals
             writer.writerow({
                 'algo': 'squaring',
                 'graph': graph_name,
                 'regex': regexes_names[regex_num],
                 'reachable_pairs': sq_nvals,
-                'building_time_ms': sq_building_time,
-                'inference_time_ms': sq_inference_time
+                'building_time_ms': sq_building_time
             })
 
             mult_building_time, mult_closure = timeit(
                 intersection.build_closure_by_adj_matrix_multiplication)()
-            mult_inference_time, mult_nvals = timeit(lambda: mult_closure.nvals)()
+            mult_nvals = mult_closure.nvals
             writer.writerow({
                 'algo': 'multiplying',
                 'graph': graph_name,
                 'regex': regexes_names[regex_num],
                 'reachable_pairs': mult_nvals,
-                'building_time_ms': mult_building_time,
-                'inference_time_ms': mult_inference_time
+                'building_time_ms': mult_building_time
             })
 
             assert sq_nvals == mult_nvals
