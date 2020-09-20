@@ -47,4 +47,4 @@ crashlytics-build.properties
 fabric.properties
 
 *.pyc
-.data
+tests/.big_data

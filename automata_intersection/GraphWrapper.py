@@ -111,7 +111,7 @@ class GraphWrapper:
                 matrix.resize(nrows=self.vertices_num, ncols=self.vertices_num)
                 adj_matrix += matrix
             closure = adj_matrix.dup()
-            while prev_nvals != closure:
+            while prev_nvals != closure.nvals:
                 prev_nvals = closure.nvals
                 closure += closure @ adj_matrix
         return closure
