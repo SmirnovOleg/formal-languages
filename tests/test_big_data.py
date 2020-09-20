@@ -11,7 +11,7 @@ from automata_intersection import GraphWrapper, RegexGraphWrapper
 data_path = os.path.join(os.getcwd(), 'tests/.big_data/')
 graphs_test_suites = os.listdir(data_path)[0]
 csv_path = os.path.join(data_path, 'benchmark.csv')
-csv_fieldnames = ['algo', 'graph', 'regex', 'nvals', 'building_time', 'inference_time']
+csv_fieldnames = ['algo', 'graph', 'regex', 'reachable_pairs', 'building_time_ms', 'inference_time_ms']
 iterations_num = 1
 
 
@@ -23,9 +23,9 @@ def timeit(func):
             start_time = time.time_ns()
             func(*args, **kwargs)
             end_time = time.time_ns()
-            delta_time = (end_time - start_time) // 1e3
+            delta_time = (end_time - start_time) // 1000000
             times.append(delta_time)
-        return sum(times) / iterations_num, func(*args, **kwargs)
+        return sum(times) // iterations_num, func(*args, **kwargs)
 
     return wrapper
 
@@ -48,7 +48,7 @@ def benchmark_suite(request):
         'graph': GraphWrapper.from_file(os.path.join(graph_path, f'{graph_name}.txt')),
         'graph_name': graph_name,
         'regexes': [
-            RegexGraphWrapper.from_regex_file(os.path.join(regexes_path, regex_name))
+            RegexGraphWrapper.from_regex_file(os.path.join(regexes_path, regex_name), is_python_regex=False)
             for regex_name in regexes_names
         ],
         'regexes_names': regexes_names
@@ -60,11 +60,11 @@ def test_big_data(benchmark_suite):
     regexes: List[RegexGraphWrapper] = benchmark_suite['regexes']
     graph_name, regexes_names = benchmark_suite['graph_name'], benchmark_suite['regexes_names']
 
-    with open(csv_path, 'w+', newline='') as csvfile:
+    with open(csv_path, 'a', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=csv_fieldnames)
 
         for regex_num, regex in enumerate(regexes):
-            print(f'Start regex: {regexes_names[regex_num]}')
+            print(f'Start regex: {regexes_names[regex_num]} ({regex_num}/{len(regexes)})')
             intersection = regex.kronecker_product(graph)
 
             sq_building_time, sq_closure = timeit(intersection.build_closure_by_squaring)()
@@ -73,9 +73,9 @@ def test_big_data(benchmark_suite):
                 'algo': 'squaring',
                 'graph': graph_name,
                 'regex': regexes_names[regex_num],
-                'nvals': sq_nvals,
-                'building_time': sq_building_time,
-                'inference_time': sq_inference_time
+                'reachable_pairs': sq_nvals,
+                'building_time_ms': sq_building_time,
+                'inference_time_ms': sq_inference_time
             })
 
             mult_building_time, mult_closure = timeit(
@@ -85,8 +85,9 @@ def test_big_data(benchmark_suite):
                 'algo': 'multiplying',
                 'graph': graph_name,
                 'regex': regexes_names[regex_num],
-                'nvals': mult_nvals,
-                'building_time': mult_building_time,
-                'inference_time': mult_inference_time
+                'reachable_pairs': mult_nvals,
+                'building_time_ms': mult_building_time,
+                'inference_time_ms': mult_inference_time
             })
+
             assert sq_nvals == mult_nvals
