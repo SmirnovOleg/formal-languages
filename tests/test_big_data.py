@@ -1,4 +1,5 @@
 import csv
+import gc
 import os
 import time
 from functools import wraps
@@ -9,9 +10,12 @@ import pytest
 from automata_intersection import GraphWrapper, RegexGraphWrapper
 
 data_path = os.path.join(os.getcwd(), 'tests/.big_data/')
-graphs_test_suites = os.listdir(data_path)[0]
+graphs_test_suites = [name for name in os.listdir(data_path)
+                      if os.path.isdir(os.path.join(data_path, name))]
+
 csv_path = os.path.join(data_path, 'benchmark.csv')
-csv_fieldnames = ['algo', 'graph', 'regex', 'reachable_pairs', 'building_time_ms']
+csv_fieldnames = ['algo', 'graph', 'regex', 'reachable_pairs',
+                  'intersection_time_ms', 'building_time_ms', 'inference_time_ms']
 iterations_num = 1
 
 
@@ -37,7 +41,7 @@ def before_session_starts():
         writer.writeheader()
 
 
-@pytest.fixture(scope='function', params=[graphs_test_suites])
+@pytest.fixture(scope='function', params=graphs_test_suites)
 def benchmark_suite(request):
     graph_name = request.param
     graph_path = os.path.join(data_path, graph_name)
@@ -60,32 +64,34 @@ def test_big_data(benchmark_suite):
     regexes: List[RegexGraphWrapper] = benchmark_suite['regexes']
     graph_name, regexes_names = benchmark_suite['graph_name'], benchmark_suite['regexes_names']
 
-    with open(csv_path, 'a', newline='') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=csv_fieldnames)
+    for regex_num, regex in enumerate(regexes):
+        gc.collect()
+        print(f'Start regex: {regexes_names[regex_num]} ({regex_num + 1}/{len(regexes)})')
 
-        for regex_num, regex in enumerate(regexes):
-            print(f'Start regex: {regexes_names[regex_num]} ({regex_num}/{len(regexes)})')
-            intersection = regex.kronecker_product(graph)
+        intersection_time, intersection = timeit(regex.kronecker_product)(graph)
+        inference_time = timeit(lambda: intersection.edges_counter)()
+        sq_building_time, sq_closure = timeit(intersection.build_closure_by_squaring)()
+        mult_building_time, mult_closure = timeit(intersection.build_closure_by_adj_matrix_multiplication)()
 
-            sq_building_time, sq_closure = timeit(intersection.build_closure_by_squaring)()
-            sq_nvals = sq_closure.nvals
+        assert sq_closure.nvals == mult_closure.nvals
+
+        with open(csv_path, 'a', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=csv_fieldnames)
             writer.writerow({
                 'algo': 'squaring',
                 'graph': graph_name,
                 'regex': regexes_names[regex_num],
-                'reachable_pairs': sq_nvals,
-                'building_time_ms': sq_building_time
+                'reachable_pairs': sq_closure.nvals,
+                'intersection_time_ms': intersection_time,
+                'building_time_ms': sq_building_time,
+                'inference_time_ms': inference_time
             })
-
-            mult_building_time, mult_closure = timeit(
-                intersection.build_closure_by_adj_matrix_multiplication)()
-            mult_nvals = mult_closure.nvals
             writer.writerow({
                 'algo': 'multiplying',
                 'graph': graph_name,
                 'regex': regexes_names[regex_num],
-                'reachable_pairs': mult_nvals,
-                'building_time_ms': mult_building_time
+                'reachable_pairs': mult_closure.nvals,
+                'intersection_time_ms': intersection_time,
+                'building_time_ms': mult_building_time,
+                'inference_time_ms': inference_time
             })
-
-            assert sq_nvals == mult_nvals
