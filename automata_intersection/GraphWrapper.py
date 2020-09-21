@@ -92,7 +92,7 @@ class GraphWrapper:
         return intersection
 
     def build_closure_by_squaring(self) -> Matrix:
-        closure = Matrix.identity(types.BOOL, self.vertices_num)
+        closure = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
         prev_nvals = closure.nvals
         with semiring.LOR_LAND_BOOL:
             for _, matrix in self.label_to_bool_matrix.items():
@@ -104,7 +104,7 @@ class GraphWrapper:
         return closure
 
     def build_closure_by_adj_matrix_multiplication(self) -> Matrix:
-        adj_matrix = Matrix.identity(types.BOOL, self.vertices_num)
+        adj_matrix = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
         prev_nvals = adj_matrix.nvals
         with semiring.LOR_LAND_BOOL:
             for _, matrix in self.label_to_bool_matrix.items():
@@ -113,7 +113,7 @@ class GraphWrapper:
             closure = adj_matrix.dup()
             while prev_nvals != closure.nvals:
                 prev_nvals = closure.nvals
-                closure += closure @ adj_matrix
+                closure += adj_matrix @ closure
         return closure
 
     def get_reachable_pairs(self, from_indices: Set[int], to_indices: Set[int]):

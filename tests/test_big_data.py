@@ -15,7 +15,7 @@ graphs_test_suites = [name for name in os.listdir(data_path)
 
 csv_path = os.path.join(data_path, 'benchmark.csv')
 csv_fieldnames = ['algo', 'graph', 'regex', 'reachable_pairs',
-                  'intersection_time_ms', 'building_time_ms', 'inference_time_ms']
+                  'intersection_time_ms', 'closure_time_ms', 'inference_time_ms']
 iterations_num = 1
 
 
@@ -69,7 +69,7 @@ def test_big_data(benchmark_suite):
         print(f'Start regex: {regexes_names[regex_num]} ({regex_num + 1}/{len(regexes)})')
 
         intersection_time, intersection = timeit(regex.kronecker_product)(graph)
-        inference_time = timeit(lambda: intersection.edges_counter)()
+        inference_time, _ = timeit(lambda: intersection.edges_counter)()
         sq_building_time, sq_closure = timeit(intersection.build_closure_by_squaring)()
         mult_building_time, mult_closure = timeit(intersection.build_closure_by_adj_matrix_multiplication)()
 
@@ -83,7 +83,7 @@ def test_big_data(benchmark_suite):
                 'regex': regexes_names[regex_num],
                 'reachable_pairs': sq_closure.nvals,
                 'intersection_time_ms': intersection_time,
-                'building_time_ms': sq_building_time,
+                'closure_time_ms': sq_building_time,
                 'inference_time_ms': inference_time
             })
             writer.writerow({
@@ -92,6 +92,6 @@ def test_big_data(benchmark_suite):
                 'regex': regexes_names[regex_num],
                 'reachable_pairs': mult_closure.nvals,
                 'intersection_time_ms': intersection_time,
-                'building_time_ms': mult_building_time,
+                'closure_time_ms': mult_building_time,
                 'inference_time_ms': inference_time
             })
