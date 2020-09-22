@@ -1,7 +1,7 @@
 ### Formal Language Theory Course assignments
 
 [![Build Status](https://travis-ci.com/SmirnovOleg/formal-languages.svg?branch=master)](https://travis-ci.com/SmirnovOleg/formal-languages)
-[![Build Status](https://travis-ci.com/SmirnovOleg/formal-languages.svg?branch=task_02)](https://travis-ci.com/SmirnovOleg/formal-languages)
+[![Build Status](https://travis-ci.com/SmirnovOleg/formal-languages.svg?branch=task_03)](https://travis-ci.com/SmirnovOleg/formal-languages)
 
 #### Installation & Running tests
 
@@ -52,3 +52,19 @@ optional arguments:
         ]
     }
     ```
+   
+#### Benchmarks
+
+ - You can put the data from this [link](https://drive.google.com/file/d/158g01o2rpdq5eL3Ari8e5SPbbeZTJspr/view?usp=sharing) to `./tests/.big_data/` directory:
+ ```
+./tests/.big_data
+----/LUBM300
+----/LUBM500
+...
+```
+ - Then run benchmarks without caching:
+
+`PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider -v -s tests/test_big_data.py`
+
+ - There were no difference detected between squaring and multiplying
+ by adjacency matrix when building transitive closure on the LUBM datasets. 
