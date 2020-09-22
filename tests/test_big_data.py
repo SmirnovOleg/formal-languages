@@ -16,7 +16,7 @@ graphs_test_suites = [name for name in os.listdir(data_path)
 csv_path = os.path.join(data_path, 'benchmark.csv')
 csv_fieldnames = ['algo', 'graph', 'regex', 'reachable_pairs',
                   'intersection_time_ms', 'closure_time_ms', 'inference_time_ms']
-iterations_num = 1
+iterations_num = 5
 
 
 def timeit(func):
