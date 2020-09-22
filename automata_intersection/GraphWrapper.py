@@ -31,8 +31,11 @@ class GraphWrapper:
             I, J = label_to_edges.setdefault(edge.label, ([], []))
             I.append(edge.node_from)
             J.append(edge.node_to)
+        maximums = [max(max(I), max(J)) for I, J in label_to_edges.values()]
+        max_size = 0 if not maximums else max(maximums) + 1
         for label, (I, J) in label_to_edges.items():
-            label_to_bool_matrix[label] = Matrix.from_lists(I, J, [True] * len(I), typ=types.BOOL)
+            label_to_bool_matrix[label] = Matrix.from_lists(I=I, J=J, V=[True] * len(I),
+                                                            ncols=max_size, nrows=max_size, typ=types.BOOL)
         self.label_to_bool_matrix = label_to_bool_matrix
         if start_states is None:
             start_states = list(range(self.vertices_num))
@@ -77,7 +80,6 @@ class GraphWrapper:
         empty_matrix = Matrix.sparse(typ=types.BOOL, nrows=step, ncols=step)
         for label, matrix in self.label_to_bool_matrix.items():
             other_matrix: Matrix = other.label_to_bool_matrix.get(label, empty_matrix)
-            other_matrix.resize(nrows=step, ncols=step)
             result_matrix = matrix.kronecker(other=other_matrix, op=binaryop.TIMES)
             label_to_kronecker_product[label] = result_matrix
         intersection = GraphWrapper._from_label_to_bool_matrix(label_to_kronecker_product)
@@ -96,7 +98,6 @@ class GraphWrapper:
         prev_nvals = closure.nvals
         with semiring.LOR_LAND_BOOL:
             for _, matrix in self.label_to_bool_matrix.items():
-                matrix.resize(nrows=self.vertices_num, ncols=self.vertices_num)
                 closure += matrix
             while prev_nvals != closure.nvals:
                 prev_nvals = closure.nvals
@@ -108,7 +109,6 @@ class GraphWrapper:
         prev_nvals = adj_matrix.nvals
         with semiring.LOR_LAND_BOOL:
             for _, matrix in self.label_to_bool_matrix.items():
-                matrix.resize(nrows=self.vertices_num, ncols=self.vertices_num)
                 adj_matrix += matrix
             closure = adj_matrix.dup()
             while prev_nvals != closure.nvals:
