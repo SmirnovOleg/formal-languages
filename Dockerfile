@@ -6,5 +6,3 @@ WORKDIR /formal_languages
 COPY . /formal_languages
 
 RUN pip3 install -r requirements.txt
-
-CMD ["/bin/python3", "-m", "pytest"]

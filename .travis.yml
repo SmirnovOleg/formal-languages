@@ -1,4 +1,4 @@
 services: docker
 script:
   - docker build -t formal_languages .
-  - docker run formal_languages
+  - docker run formal_languages /bin/python3 -m pytest --ignore-glob='*big_data.py'

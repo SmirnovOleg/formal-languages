@@ -31,8 +31,11 @@ class GraphWrapper:
             I, J = label_to_edges.setdefault(edge.label, ([], []))
             I.append(edge.node_from)
             J.append(edge.node_to)
+        maximums = [max(max(I), max(J)) for I, J in label_to_edges.values()]
+        max_size = 0 if not maximums else max(maximums) + 1
         for label, (I, J) in label_to_edges.items():
-            label_to_bool_matrix[label] = Matrix.from_lists(I, J, [True] * len(I), typ=types.BOOL)
+            label_to_bool_matrix[label] = Matrix.from_lists(I=I, J=J, V=[True] * len(I),
+                                                            ncols=max_size, nrows=max_size, typ=types.BOOL)
         self.label_to_bool_matrix = label_to_bool_matrix
         if start_states is None:
             start_states = list(range(self.vertices_num))
@@ -77,7 +80,6 @@ class GraphWrapper:
         empty_matrix = Matrix.sparse(typ=types.BOOL, nrows=step, ncols=step)
         for label, matrix in self.label_to_bool_matrix.items():
             other_matrix: Matrix = other.label_to_bool_matrix.get(label, empty_matrix)
-            other_matrix.resize(nrows=step, ncols=step)
             result_matrix = matrix.kronecker(other=other_matrix, op=binaryop.TIMES)
             label_to_kronecker_product[label] = result_matrix
         intersection = GraphWrapper._from_label_to_bool_matrix(label_to_kronecker_product)
@@ -91,18 +93,31 @@ class GraphWrapper:
         ))))
         return intersection
 
-    def get_reachability_matrix(self) -> Matrix:
-        reachability_matrix = Matrix.identity(types.BOOL, self.vertices_num)
+    def build_closure_by_squaring(self) -> Matrix:
+        closure = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
+        prev_nvals = closure.nvals
         with semiring.LOR_LAND_BOOL:
             for _, matrix in self.label_to_bool_matrix.items():
-                matrix.resize(nrows=self.vertices_num, ncols=self.vertices_num)
-                reachability_matrix += matrix
-            for i in range(self.vertices_num - 1):
-                reachability_matrix += reachability_matrix @ reachability_matrix
-        return reachability_matrix
+                closure += matrix
+            while prev_nvals != closure.nvals:
+                prev_nvals = closure.nvals
+                closure += closure @ closure
+        return closure
+
+    def build_closure_by_adj_matrix_multiplication(self) -> Matrix:
+        adj_matrix = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
+        prev_nvals = adj_matrix.nvals
+        with semiring.LOR_LAND_BOOL:
+            for _, matrix in self.label_to_bool_matrix.items():
+                adj_matrix += matrix
+            closure = adj_matrix.dup()
+            while prev_nvals != closure.nvals:
+                prev_nvals = closure.nvals
+                closure += adj_matrix @ closure
+        return closure
 
     def get_reachable_pairs(self, from_indices: Set[int], to_indices: Set[int]):
-        reachability_matrix = self.get_reachability_matrix()
+        reachability_matrix = self.build_closure_by_squaring()
         result: List[Tuple[int, int]] = []
         for from_index in from_indices:
             for to_index in to_indices:

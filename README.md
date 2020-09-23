@@ -1,14 +1,14 @@
 ### Formal Language Theory Course assignments
 
 [![Build Status](https://travis-ci.com/SmirnovOleg/formal-languages.svg?branch=master)](https://travis-ci.com/SmirnovOleg/formal-languages)
-[![Build Status](https://travis-ci.com/SmirnovOleg/formal-languages.svg?branch=task_02)](https://travis-ci.com/SmirnovOleg/formal-languages)
+[![Build Status](https://travis-ci.com/SmirnovOleg/formal-languages.svg?branch=task_03)](https://travis-ci.com/SmirnovOleg/formal-languages)
 
 #### Installation & Running tests
 
  - `git clone https://github.com/SmirnovOleg/formal-languages.git`
  - `cd formal_languages`
  - `docker build -t formal_languages .`
- - `docker run formal_languages`
+ - `docker run formal_languages /bin/python3 -m pytest --ignore-glob='*big_data.py'`
  
 #### Using CLI interface to solve RPQ
 
@@ -52,3 +52,23 @@ optional arguments:
         ]
     }
     ```
+   
+#### Benchmarks
+
+ - You can put the data from this [link](https://drive.google.com/file/d/158g01o2rpdq5eL3Ari8e5SPbbeZTJspr/view?usp=sharing) to `./tests/.big_data/` directory:
+ ```
+./tests/.big_data/
+----LUBM300/
+--------LUBM300.txt
+--------regexes/
+------------q1_0.txt
+------------q2_0.txt
+------------...
+----LUBM500/
+----...
+```
+ - Also you may need to install `pygraphblas-v3.3.3` to avoid failing with `pygraphblas.base.OutOfMemory: b'GraphBLAS error: GrB_OUT_OF_MEMORY`
+ - Then run benchmarks without caching:
+`PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider -v -s tests/test_big_data.py`
+ - There were no difference detected between squaring and multiplying
+ by adjacency matrix when building transitive closure on the *LUBM* datasets. 
