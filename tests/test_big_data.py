@@ -7,7 +7,7 @@ from typing import List
 
 import pytest
 
-from automata_intersection import GraphWrapper, RegexGraphWrapper
+from wrappers import GraphWrapper, RegexGraphWrapper
 
 data_path = os.path.join(os.getcwd(), 'tests/.big_data/')
 graphs_test_suites = [name for name in os.listdir(data_path)

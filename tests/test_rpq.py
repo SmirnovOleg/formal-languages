@@ -5,8 +5,8 @@ import random
 import pytest
 from pyformlang.finite_automaton import FiniteAutomaton
 
-from automata_intersection import GraphWrapper, RegexGraphWrapper, Edge
-from automata_intersection.main import solve_rpq
+from run import solve_rpq
+from wrappers import GraphWrapper, RegexGraphWrapper, Edge
 
 rpq_data_path = os.path.join(os.getcwd(), 'tests/rpq_data')
 rpq_test_suites = os.listdir(rpq_data_path)
