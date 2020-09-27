@@ -1,11 +1,16 @@
 from pyformlang.cfg import Variable, Terminal, CFG, Production
 
+from wrappers import GraphWrapper
+
 
 class GrammarWrapper:
     cfg: CFG
 
-    def __init__(self, cfg: CFG):
-        self.cfg = cfg
+    def __init__(self, cfg: CFG, to_normal_form=True):
+        if to_normal_form:
+            self.cfg = cfg.to_normal_form()
+        else:
+            self.cfg = cfg
 
     @classmethod
     def from_file(cls, path_to_file: str):
@@ -58,5 +63,7 @@ class GrammarWrapper:
 
 
 if __name__ == '__main__':
-    wrapper = GrammarWrapper.from_file('grammar.txt')
-    print(wrapper.contains_using_CYK(''))
+    graph = GraphWrapper.from_file('graph.txt')
+    cfg_wrapper = GrammarWrapper.from_file('grammar.txt')
+    result = graph.hellings_cfpq(cfg_wrapper.cfg)
+    print(result)
