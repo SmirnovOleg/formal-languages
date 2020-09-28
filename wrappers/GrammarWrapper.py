@@ -1,3 +1,5 @@
+from typing import List
+
 from pyformlang.cfg import Variable, Terminal, CFG, Production
 
 from wrappers import GraphWrapper
@@ -13,29 +15,33 @@ class GrammarWrapper:
             self.cfg = cfg
 
     @classmethod
-    def from_file(cls, path_to_file: str):
+    def from_text(cls, text: List[str]):
         vars, terms, prods = set(), set(), set()
         start_var = None
-        with open(path_to_file, 'r') as file:
-            for line in file.readlines():
-                raw_head, *raw_body = line.split()
-                if start_var is None:
-                    start_var = Variable(raw_head)
-                head = Variable(raw_head)
-                vars.add(head)
-                body = []
-                for element in raw_body:
-                    if element.islower():
-                        term = Terminal(element)
-                        terms.add(term)
-                        body.append(term)
-                    else:
-                        var = Variable(element)
-                        vars.add(var)
-                        body.append(var)
-                prods.add(Production(head, body))
+        for line in text:
+            raw_head, *raw_body = line.split()
+            if start_var is None:
+                start_var = Variable(raw_head)
+            head = Variable(raw_head)
+            vars.add(head)
+            body = []
+            for element in raw_body:
+                if element.islower():
+                    term = Terminal(element)
+                    terms.add(term)
+                    body.append(term)
+                else:
+                    var = Variable(element)
+                    vars.add(var)
+                    body.append(var)
+            prods.add(Production(head, body))
         cfg = CFG(vars, terms, start_var, prods)
         return cls(cfg)
+
+    @classmethod
+    def from_file(cls, path_to_file: str):
+        with open(path_to_file, 'r') as file:
+            return cls.from_text(file.readlines())
 
     def contains(self, word: str) -> bool:
         size = len(word)
