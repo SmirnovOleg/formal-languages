@@ -6,7 +6,7 @@ from wrappers import GraphWrapper
 class GrammarWrapper:
     cfg: CFG
 
-    def __init__(self, cfg: CFG, to_normal_form=True):
+    def __init__(self, cfg: CFG, to_normal_form=False):
         if to_normal_form:
             self.cfg = cfg.to_normal_form()
         else:
@@ -37,15 +37,15 @@ class GrammarWrapper:
         cfg = CFG(vars, terms, start_var, prods)
         return cls(cfg)
 
-    def contains_using_CYK(self, word: str):
-        self.cfg.to_normal_form()
+    def contains(self, word: str) -> bool:
         size = len(word)
         if size == 0:
-            raise NotImplementedError('Epsilons are not currently supported')
+            return self.cfg.generate_epsilon()
+        cnf = self.cfg.to_normal_form()
         inference_matrix = [[set() for _ in range(size)] for _ in range(size)]
         for i in range(size):
             term = Terminal(word[i])
-            for prod in self.cfg.productions:
+            for prod in cnf.productions:
                 if len(prod.body) == 1 and prod.body[0] == term:
                     inference_matrix[i][i].add(prod.head)
         for length in range(1, size):
@@ -55,15 +55,15 @@ class GrammarWrapper:
                 for split in range(length):
                     first_part = inference_matrix[pos][pos + split]
                     second_part = inference_matrix[pos + split + 1][pos + length]
-                    for prod in self.cfg.productions:
+                    for prod in cnf.productions:
                         if len(prod.body) == 2:
                             if prod.body[0] in first_part and prod.body[1] in second_part:
                                 inference_matrix[pos][pos + length].add(prod.head)
-        return self.cfg.start_symbol in inference_matrix[0][size - 1]
+        return cnf.start_symbol in inference_matrix[0][size - 1]
 
 
 if __name__ == '__main__':
     graph = GraphWrapper.from_file('graph.txt')
     cfg_wrapper = GrammarWrapper.from_file('grammar.txt')
-    result = graph.hellings_cfpq(cfg_wrapper.cfg)
-    print(result)
+    result = graph.cfpq(cfg_wrapper.cfg)
+    print(cfg_wrapper.contains(''))

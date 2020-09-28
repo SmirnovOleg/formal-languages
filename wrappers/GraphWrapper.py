@@ -142,48 +142,55 @@ class GraphWrapper:
                 nfa.add_transition(states[i], symbols[label], states[j])
         return nfa
 
-    def hellings_cfpq(self, cfg: CFG):
+    def cfpq(self, cfg: CFG):
         result: Dict[Variable, Matrix] = {}
         working_queue = deque()
         visited = set()
-        with semiring.LOR_LAND_BOOL:
-            for label, matrix in self.label_to_bool_matrix.items():
-                for prod in cfg.productions:
-                    if len(prod.body) == 1 and Terminal(label) == prod.body[0]:
-                        result[prod.head] = matrix
-                        for i, j, _ in zip(*matrix.to_lists()):
-                            working_queue.append((i, j, prod.head))
-                            visited.add((i, j, prod.head))
-                        break
-            while len(working_queue) != 0:
-                node_from, node_to, var = working_queue.popleft()
-                update = []
-                for var_before, matrix in result.items():
-                    for node_before, _ in matrix[:, node_from]:
-                        for prod in cfg.productions:
-                            if (len(prod.body) == 2
-                                    and prod.body[0] == var_before
-                                    and prod.body[1] == var
-                                    and (prod.head not in result
-                                         or result[prod.head].get(node_before, node_to) is None)):
-                                update.append((node_before, node_to, prod.head))
-                for var_after, matrix in result.items():
-                    for node_after, _ in matrix[node_to]:
-                        for prod in cfg.productions:
-                            if (len(prod.body) == 2
-                                    and prod.body[0] == var
-                                    and prod.body[1] == var_after
-                                    and (prod.head not in result
-                                         or result[prod.head].get(node_from, node_after) is None)):
-                                update.append((node_from, node_after, prod.head))
-                for node_from, node_to, var in update:
-                    if (node_from, node_to, var) in visited:
-                        continue
-                    working_queue.append((node_from, node_to, var))
-                    if var in result:
-                        result[var][node_from, node_to] = True
-                    else:
-                        empty_matrix = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
-                        result[var] = empty_matrix
-                        result[var][node_from, node_to] = True
-            return result
+
+        if cfg.generate_epsilon():
+            result[cfg.start_symbol] = Matrix.identity(types.BOOL, self.vertices_num)
+            for i in range(self.vertices_num):
+                working_queue.append((i, i, cfg.start_symbol))
+        cfg = cfg.to_normal_form()
+
+        for label, matrix in self.label_to_bool_matrix.items():
+            for prod in cfg.productions:
+                if len(prod.body) == 1 and Terminal(label) == prod.body[0]:
+                    result[prod.head] = matrix
+                    for i, j, _ in zip(*matrix.to_lists()):
+                        working_queue.append((i, j, prod.head))
+                        visited.add((i, j, prod.head))
+                    break
+
+        while len(working_queue) != 0:
+            node_from, node_to, var = working_queue.popleft()
+            update = []
+            for var_before, matrix in result.items():
+                for node_before, _ in matrix[:, node_from]:
+                    for prod in cfg.productions:
+                        if (len(prod.body) == 2
+                                and prod.body[0] == var_before
+                                and prod.body[1] == var
+                                and (prod.head not in result
+                                     or result[prod.head].get(node_before, node_to) is None)):
+                            update.append((node_before, node_to, prod.head))
+            for var_after, matrix in result.items():
+                for node_after, _ in matrix[node_to]:
+                    for prod in cfg.productions:
+                        if (len(prod.body) == 2
+                                and prod.body[0] == var
+                                and prod.body[1] == var_after
+                                and (prod.head not in result
+                                     or result[prod.head].get(node_from, node_after) is None)):
+                            update.append((node_from, node_after, prod.head))
+            for node_from, node_to, var in update:
+                if (node_from, node_to, var) in visited:
+                    continue
+                working_queue.append((node_from, node_to, var))
+                if var in result:
+                    result[var][node_from, node_to] = True
+                else:
+                    empty_matrix = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
+                    result[var] = empty_matrix
+                    result[var][node_from, node_to] = True
+        return [(i, j) for i, j, _ in zip(*result[cfg.start_symbol].to_lists())]
