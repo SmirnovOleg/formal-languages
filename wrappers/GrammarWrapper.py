@@ -2,8 +2,6 @@ from typing import List
 
 from pyformlang.cfg import Variable, Terminal, CFG, Production
 
-from wrappers import GraphWrapper
-
 
 class GrammarWrapper:
     cfg: CFG
@@ -43,7 +41,7 @@ class GrammarWrapper:
         with open(path_to_file, 'r') as file:
             return cls.from_text(file.readlines())
 
-    def contains(self, word: str) -> bool:
+    def accepts(self, word: str) -> bool:
         size = len(word)
         if size == 0:
             return self.cfg.generate_epsilon()
@@ -66,10 +64,3 @@ class GrammarWrapper:
                             if prod.body[0] in first_part and prod.body[1] in second_part:
                                 inference_matrix[pos][pos + length].add(prod.head)
         return cnf.start_symbol in inference_matrix[0][size - 1]
-
-
-if __name__ == '__main__':
-    graph = GraphWrapper.from_file('graph.txt')
-    cfg_wrapper = GrammarWrapper.from_file('grammar.txt')
-    result = graph.cfpq(cfg_wrapper.cfg)
-    print(cfg_wrapper.contains(''))

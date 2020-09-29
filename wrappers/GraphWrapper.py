@@ -52,13 +52,17 @@ class GraphWrapper:
 
     @classmethod
     def from_file(cls, path_to_file: str):
-        edges = []
         with open(path_to_file, 'r') as input_file:
-            for line in input_file.readlines():
-                vertex_from, label, vertex_to = line.split(' ')
-                edges.append(Edge(node_from=int(vertex_from),
-                                  node_to=int(vertex_to),
-                                  label=label))
+            return cls.from_text(input_file.readlines())
+
+    @classmethod
+    def from_text(cls, text: List[str]):
+        edges = []
+        for line in text:
+            vertex_from, label, vertex_to = line.split(' ')
+            edges.append(Edge(node_from=int(vertex_from),
+                              node_to=int(vertex_to),
+                              label=label))
         return cls(edges)
 
     @classmethod

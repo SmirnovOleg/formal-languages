@@ -59,6 +59,7 @@ def benchmark_suite(request):
     }
 
 
+@pytest.mark.skip(reason="there is no need to run benchmarks each time")
 def test_big_data(benchmark_suite):
     graph: GraphWrapper = benchmark_suite['graph']
     regexes: List[RegexGraphWrapper] = benchmark_suite['regexes']
