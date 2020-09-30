@@ -200,4 +200,7 @@ class GraphWrapper:
                     empty_matrix = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
                     result[var] = empty_matrix
                     result[var][node_from, node_to] = True
-        return set([(i, j) for i, j, _ in zip(*result[cfg.start_symbol].to_lists())])
+        if cfg.start_symbol in result:
+            return set([(i, j) for i, j, _ in zip(*result[cfg.start_symbol].to_lists())])
+        else:
+            return set()
