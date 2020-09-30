@@ -1,7 +1,9 @@
+from collections import deque
 from dataclasses import dataclass
 from itertools import chain
 from typing import Tuple, Dict, List, Set, Optional
 
+from pyformlang.cfg import CFG, Terminal, Variable
 from pyformlang.finite_automaton import State, Symbol, NondeterministicFiniteAutomaton
 from pygraphblas import Matrix, semiring
 from pygraphblas import binaryop
@@ -19,6 +21,7 @@ class Edge:
 
 class GraphWrapper:
     label_to_bool_matrix: Dict[str, Matrix] = {}
+    vertices: Set[int]
     start_states: Indices
     final_states: Indices
 
@@ -27,21 +30,23 @@ class GraphWrapper:
                  final_states: Optional[Indices] = None):
         label_to_edges: Dict[str, Tuple[Indices, Indices]] = {}
         label_to_bool_matrix: Dict[str, Matrix] = {}
+        self.vertices = set()
         for edge in edges:
             I, J = label_to_edges.setdefault(edge.label, ([], []))
             I.append(edge.node_from)
             J.append(edge.node_to)
-        maximums = [max(max(I), max(J)) for I, J in label_to_edges.values()]
-        max_size = 0 if not maximums else max(maximums) + 1
+            self.vertices.add(edge.node_from)
+            self.vertices.add(edge.node_to)
+        max_size = 0 if not self.vertices else max(self.vertices) + 1
         for label, (I, J) in label_to_edges.items():
             label_to_bool_matrix[label] = Matrix.from_lists(I=I, J=J, V=[True] * len(I),
                                                             ncols=max_size, nrows=max_size, typ=types.BOOL)
         self.label_to_bool_matrix = label_to_bool_matrix
         if start_states is None:
-            start_states = list(range(self.vertices_num))
+            start_states = list(self.vertices)
         self.start_states = start_states
         if final_states is None:
-            final_states = list(range(self.vertices_num))
+            final_states = list(self.vertices)
         self.final_states = final_states
 
     @classmethod
@@ -50,13 +55,17 @@ class GraphWrapper:
 
     @classmethod
     def from_file(cls, path_to_file: str):
-        edges = []
         with open(path_to_file, 'r') as input_file:
-            for line in input_file.readlines():
-                vertex_from, label, vertex_to = line.split(' ')
-                edges.append(Edge(node_from=int(vertex_from),
-                                  node_to=int(vertex_to),
-                                  label=label))
+            return cls.from_text(input_file.readlines())
+
+    @classmethod
+    def from_text(cls, text: List[str]):
+        edges = []
+        for line in text:
+            vertex_from, label, vertex_to = line.split(' ')
+            edges.append(Edge(node_from=int(vertex_from),
+                              node_to=int(vertex_to),
+                              label=label))
         return cls(edges)
 
     @classmethod
@@ -139,3 +148,55 @@ class GraphWrapper:
             for i, j, _ in zip(*matrix.to_lists()):
                 nfa.add_transition(states[i], symbols[label], states[j])
         return nfa
+
+    def cfpq(self, cfg: CFG) -> Set[Tuple[int, int]]:
+        result: Dict[Variable, Matrix] = {}
+        working_queue = deque()
+
+        if cfg.generate_epsilon():
+            result[cfg.start_symbol] = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
+            for v in self.vertices:
+                result[cfg.start_symbol][v, v] = True
+                working_queue.append((v, v, cfg.start_symbol))
+        cfg = cfg.to_normal_form()
+
+        for label, matrix in self.label_to_bool_matrix.items():
+            for prod in cfg.productions:
+                if len(prod.body) == 1 and Terminal(label) == prod.body[0]:
+                    result[prod.head] = matrix
+                    for i, j, _ in zip(*matrix.to_lists()):
+                        working_queue.append((i, j, prod.head))
+
+        while len(working_queue) != 0:
+            node_from, node_to, var = working_queue.popleft()
+            update = []
+            for var_before, matrix in result.items():
+                for node_before, _ in matrix[:, node_from]:
+                    for prod in cfg.productions:
+                        if (len(prod.body) == 2
+                                and prod.body[0] == var_before
+                                and prod.body[1] == var
+                                and (prod.head not in result
+                                     or result[prod.head].get(node_before, node_to) is None)):
+                            update.append((node_before, node_to, prod.head))
+            for var_after, matrix in result.items():
+                for node_after, _ in matrix[node_to]:
+                    for prod in cfg.productions:
+                        if (len(prod.body) == 2
+                                and prod.body[0] == var
+                                and prod.body[1] == var_after
+                                and (prod.head not in result
+                                     or result[prod.head].get(node_from, node_after) is None)):
+                            update.append((node_from, node_after, prod.head))
+            for node_from, node_to, var in update:
+                working_queue.append((node_from, node_to, var))
+                if var in result:
+                    result[var][node_from, node_to] = True
+                else:
+                    empty_matrix = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
+                    result[var] = empty_matrix
+                    result[var][node_from, node_to] = True
+        if cfg.start_symbol in result:
+            return set([(i, j) for i, j, _ in zip(*result[cfg.start_symbol].to_lists())])
+        else:
+            return set()

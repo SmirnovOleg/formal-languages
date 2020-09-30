@@ -7,11 +7,14 @@ from typing import List
 
 import pytest
 
-from automata_intersection import GraphWrapper, RegexGraphWrapper
+from wrappers import GraphWrapper, RegexGraphWrapper
 
 data_path = os.path.join(os.getcwd(), 'tests/.big_data/')
-graphs_test_suites = [name for name in os.listdir(data_path)
-                      if os.path.isdir(os.path.join(data_path, name))]
+try:
+    graphs_test_suites = [name for name in os.listdir(data_path)
+                          if os.path.isdir(os.path.join(data_path, name))]
+except FileNotFoundError:
+    graphs_test_suites = []
 
 csv_path = os.path.join(data_path, 'benchmark.csv')
 csv_fieldnames = ['algo', 'graph', 'regex', 'reachable_pairs',
@@ -59,6 +62,7 @@ def benchmark_suite(request):
     }
 
 
+@pytest.mark.skip(reason="there is no need to run benchmarks each time")
 def test_big_data(benchmark_suite):
     graph: GraphWrapper = benchmark_suite['graph']
     regexes: List[RegexGraphWrapper] = benchmark_suite['regexes']

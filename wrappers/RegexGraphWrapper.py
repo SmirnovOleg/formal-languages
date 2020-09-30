@@ -3,7 +3,7 @@ from typing import Dict
 from pyformlang.finite_automaton import EpsilonNFA, DeterministicFiniteAutomaton, State
 from pyformlang.regular_expression import Regex
 
-from automata_intersection import GraphWrapper, Edge
+from wrappers import GraphWrapper, Edge
 
 
 class RegexGraphWrapper(GraphWrapper):

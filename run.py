@@ -1,9 +1,8 @@
 import argparse
 import json
-from itertools import chain
 from typing import Set, Tuple, Dict, Union, List
 
-from automata_intersection import GraphWrapper, RegexGraphWrapper
+from wrappers import GraphWrapper, RegexGraphWrapper
 
 
 def solve_rpq(graph: GraphWrapper, constraint: RegexGraphWrapper,
