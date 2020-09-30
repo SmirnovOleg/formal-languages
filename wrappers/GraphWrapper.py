@@ -152,7 +152,6 @@ class GraphWrapper:
     def cfpq(self, cfg: CFG) -> Set[Tuple[int, int]]:
         result: Dict[Variable, Matrix] = {}
         working_queue = deque()
-        visited = set()
 
         if cfg.generate_epsilon():
             result[cfg.start_symbol] = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
@@ -167,7 +166,6 @@ class GraphWrapper:
                     result[prod.head] = matrix
                     for i, j, _ in zip(*matrix.to_lists()):
                         working_queue.append((i, j, prod.head))
-                        visited.add((i, j, prod.head))
 
         while len(working_queue) != 0:
             node_from, node_to, var = working_queue.popleft()
@@ -191,8 +189,6 @@ class GraphWrapper:
                                      or result[prod.head].get(node_from, node_after) is None)):
                             update.append((node_from, node_after, prod.head))
             for node_from, node_to, var in update:
-                if (node_from, node_to, var) in visited:
-                    continue
                 working_queue.append((node_from, node_to, var))
                 if var in result:
                     result[var][node_from, node_to] = True
