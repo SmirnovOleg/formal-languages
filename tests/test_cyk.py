@@ -20,7 +20,7 @@ grammars = [
     [(grammars[2], word, True) for word in ['aabb', 'ab', 'aaaabbbb']],
     [(grammars[2], word, False) for word in ['aab', 'a', 'b', '', 'ba', 'aa']],
     [(grammars[3], word, True) for word in ['', 'abc', 'a', 'b', 'c', 'aab', 'bbbccccc', 'aabbbbc']],
-    [(grammars[3], word, False) for word in ['bac', 'bca', 'acccb']],
+    [(grammars[3], word, False) for word in ['bac', 'bca', 'acccb', 'dddea', 'f']],
 )))
 def suite(request):
     grammar, word, expected = request.param
