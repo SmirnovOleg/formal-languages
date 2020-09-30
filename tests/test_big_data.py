@@ -10,8 +10,11 @@ import pytest
 from wrappers import GraphWrapper, RegexGraphWrapper
 
 data_path = os.path.join(os.getcwd(), 'tests/.big_data/')
-graphs_test_suites = [name for name in os.listdir(data_path)
-                      if os.path.isdir(os.path.join(data_path, name))]
+try:
+    graphs_test_suites = [name for name in os.listdir(data_path)
+                          if os.path.isdir(os.path.join(data_path, name))]
+except FileNotFoundError:
+    graphs_test_suites = []
 
 csv_path = os.path.join(data_path, 'benchmark.csv')
 csv_fieldnames = ['algo', 'graph', 'regex', 'reachable_pairs',

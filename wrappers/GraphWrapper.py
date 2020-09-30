@@ -21,6 +21,7 @@ class Edge:
 
 class GraphWrapper:
     label_to_bool_matrix: Dict[str, Matrix] = {}
+    vertices: Set[int]
     start_states: Indices
     final_states: Indices
 
@@ -29,21 +30,23 @@ class GraphWrapper:
                  final_states: Optional[Indices] = None):
         label_to_edges: Dict[str, Tuple[Indices, Indices]] = {}
         label_to_bool_matrix: Dict[str, Matrix] = {}
+        self.vertices = set()
         for edge in edges:
             I, J = label_to_edges.setdefault(edge.label, ([], []))
             I.append(edge.node_from)
             J.append(edge.node_to)
-        maximums = [max(max(I), max(J)) for I, J in label_to_edges.values()]
-        max_size = 0 if not maximums else max(maximums) + 1
+            self.vertices.add(edge.node_from)
+            self.vertices.add(edge.node_to)
+        max_size = 0 if not self.vertices else max(self.vertices) + 1
         for label, (I, J) in label_to_edges.items():
             label_to_bool_matrix[label] = Matrix.from_lists(I=I, J=J, V=[True] * len(I),
                                                             ncols=max_size, nrows=max_size, typ=types.BOOL)
         self.label_to_bool_matrix = label_to_bool_matrix
         if start_states is None:
-            start_states = list(range(self.vertices_num))
+            start_states = list(self.vertices)
         self.start_states = start_states
         if final_states is None:
-            final_states = list(range(self.vertices_num))
+            final_states = list(self.vertices)
         self.final_states = final_states
 
     @classmethod
@@ -146,15 +149,16 @@ class GraphWrapper:
                 nfa.add_transition(states[i], symbols[label], states[j])
         return nfa
 
-    def cfpq(self, cfg: CFG):
+    def cfpq(self, cfg: CFG) -> Set[Tuple[int, int]]:
         result: Dict[Variable, Matrix] = {}
         working_queue = deque()
         visited = set()
 
         if cfg.generate_epsilon():
-            result[cfg.start_symbol] = Matrix.identity(types.BOOL, self.vertices_num)
-            for i in range(self.vertices_num):
-                working_queue.append((i, i, cfg.start_symbol))
+            result[cfg.start_symbol] = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
+            for v in self.vertices:
+                result[cfg.start_symbol][v, v] = True
+                working_queue.append((v, v, cfg.start_symbol))
         cfg = cfg.to_normal_form()
 
         for label, matrix in self.label_to_bool_matrix.items():
@@ -164,7 +168,6 @@ class GraphWrapper:
                     for i, j, _ in zip(*matrix.to_lists()):
                         working_queue.append((i, j, prod.head))
                         visited.add((i, j, prod.head))
-                    break
 
         while len(working_queue) != 0:
             node_from, node_to, var = working_queue.popleft()
@@ -197,4 +200,4 @@ class GraphWrapper:
                     empty_matrix = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
                     result[var] = empty_matrix
                     result[var][node_from, node_to] = True
-        return [(i, j) for i, j, _ in zip(*result[cfg.start_symbol].to_lists())]
+        return set([(i, j) for i, j, _ in zip(*result[cfg.start_symbol].to_lists())])
