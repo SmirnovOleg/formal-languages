@@ -164,12 +164,16 @@ class GraphWrapper:
                 result[cfg.start_symbol][v, v] = True
                 working_queue.append((v, v, cfg.start_symbol))
         cfg = cfg.to_normal_form()
-        for label, matrix in self.label_to_bool_matrix.items():
-            for prod in cfg.productions:
-                if len(prod.body) == 1 and Terminal(label) == prod.body[0]:
-                    result[prod.head] = matrix.dup()
-                    for i, j, _ in zip(*matrix.to_lists()):
-                        working_queue.append((i, j, prod.head))
+        with semiring.LOR_LAND_BOOL:
+            for label, matrix in self.label_to_bool_matrix.items():
+                for prod in cfg.productions:
+                    if len(prod.body) == 1 and Terminal(label) == prod.body[0]:
+                        if prod.head in result:
+                            result[prod.head] += matrix.dup()
+                        else:
+                            result[prod.head] = matrix.dup()
+                        for i, j, _ in matrix:
+                            working_queue.append((i, j, prod.head))
         while len(working_queue) != 0:
             node_from, node_to, var = working_queue.popleft()
             update = []
@@ -214,21 +218,25 @@ class GraphWrapper:
                 nonterm_productions.add(production)
             else:
                 term_productions.add(production)
-        for label, matrix in self.label_to_bool_matrix.items():
-            for production in term_productions:
-                if Terminal(label) == production.body[0]:
-                    result[production.head] = matrix.dup()
-        has_changed = True
-        while has_changed:
-            has_changed = False
-            for production in nonterm_productions:
-                if production.body[0] not in result or production.body[1] not in result:
-                    continue
-                if production.head not in result:
-                    result[production.head] = Matrix.sparse(types.BOOL, self.matrix_size, self.matrix_size)
-                old_nvals = result[production.head].nvals
-                result[production.head] += result[production.body[0]] @ result[production.body[1]]
-                has_changed |= result[production.head].nvals != old_nvals
+        with semiring.LOR_LAND_BOOL:
+            for label, matrix in self.label_to_bool_matrix.items():
+                for production in term_productions:
+                    if Terminal(label) == production.body[0]:
+                        if production.head in result:
+                            result[production.head] += matrix.dup()
+                        else:
+                            result[production.head] = matrix.dup()
+            has_changed = True
+            while has_changed:
+                has_changed = False
+                for production in nonterm_productions:
+                    if production.body[0] not in result or production.body[1] not in result:
+                        continue
+                    if production.head not in result:
+                        result[production.head] = Matrix.sparse(types.BOOL, self.matrix_size, self.matrix_size)
+                    old_nvals = result[production.head].nvals
+                    result[production.head] += result[production.body[0]] @ result[production.body[1]]
+                    has_changed |= result[production.head].nvals != old_nvals
         return set([(i, j) for i, j, _ in result.get(cfg.start_symbol, [])])
 
     def cfpq_tensors(self, cfg: CFG):
