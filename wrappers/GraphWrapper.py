@@ -20,10 +20,6 @@ class Edge:
 
 
 class GraphWrapper:
-    label_to_bool_matrix: Dict[str, Matrix] = {}
-    vertices: Set[int]
-    start_states: Indices
-    final_states: Indices
 
     def __init__(self, edges: List[Edge],
                  start_states: Optional[Indices] = None,
@@ -38,6 +34,7 @@ class GraphWrapper:
             self.vertices.add(edge.node_from)
             self.vertices.add(edge.node_to)
         max_size = 0 if not self.vertices else max(self.vertices) + 1
+        self.matrix_size = max_size
         for label, (I, J) in label_to_edges.items():
             label_to_bool_matrix[label] = Matrix.from_lists(I=I, J=J, V=[True] * len(I),
                                                             ncols=max_size, nrows=max_size, typ=types.BOOL)
@@ -149,24 +146,21 @@ class GraphWrapper:
                 nfa.add_transition(states[i], symbols[label], states[j])
         return nfa
 
-    def cfpq(self, cfg: CFG) -> Set[Tuple[int, int]]:
+    def cfpq_hellings(self, cfg: CFG) -> Set[Tuple[int, int]]:
         result: Dict[Variable, Matrix] = {}
         working_queue = deque()
-
         if cfg.generate_epsilon():
             result[cfg.start_symbol] = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
             for v in self.vertices:
                 result[cfg.start_symbol][v, v] = True
                 working_queue.append((v, v, cfg.start_symbol))
         cfg = cfg.to_normal_form()
-
         for label, matrix in self.label_to_bool_matrix.items():
             for prod in cfg.productions:
                 if len(prod.body) == 1 and Terminal(label) == prod.body[0]:
-                    result[prod.head] = matrix
+                    result[prod.head] = matrix.dup()
                     for i, j, _ in zip(*matrix.to_lists()):
                         working_queue.append((i, j, prod.head))
-
         while len(working_queue) != 0:
             node_from, node_to, var = working_queue.popleft()
             update = []
@@ -196,7 +190,51 @@ class GraphWrapper:
                     empty_matrix = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
                     result[var] = empty_matrix
                     result[var][node_from, node_to] = True
-        if cfg.start_symbol in result:
-            return set([(i, j) for i, j, _ in zip(*result[cfg.start_symbol].to_lists())])
-        else:
-            return set()
+        return set([(from_node, to_node) for from_node, to_node, _ in result.get(cfg.start_symbol, [])])
+
+    def cfpq_matrices(self, cfg: CFG) -> Set[Tuple[int, int]]:
+        result: Dict[Variable, Matrix] = {}
+        if cfg.generate_epsilon():
+            result[cfg.start_symbol] = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
+            for v in self.vertices:
+                result[cfg.start_symbol][v, v] = True
+        cfg = cfg.to_normal_form()
+        term_productions, nonterm_productions = set(), set()
+        for production in cfg.productions:
+            if len(production.body) == 2:
+                nonterm_productions.add(production)
+            else:
+                term_productions.add(production)
+        for label, matrix in self.label_to_bool_matrix.items():
+            for production in term_productions:
+                if Terminal(label) == production.body[0]:
+                    result[production.head] = matrix.dup()
+        has_changed = True
+        while has_changed:
+            matrices_product = {}
+            for production in nonterm_productions:
+                if production.body[0] not in result or production.body[1] not in result:
+                    continue
+                matrix1, matrix2 = result[production.body[0]], result[production.body[1]]
+                matrix3 = matrices_product.setdefault(production.head,
+                                                      Matrix.sparse(types.BOOL, self.matrix_size, self.matrix_size))
+                for i, col_num, _ in matrix1:
+                    for row_num, j, _ in matrix2:
+                        if col_num == row_num:
+                            matrix3[i, j] = True
+            has_changed = False
+            with semiring.LOR_LAND_BOOL:
+                for nonterm, matrix in matrices_product.items():
+                    if nonterm in result:
+                        old_nvals = result[nonterm].nvals
+                        result[nonterm] += matrix
+                        has_changed |= result[nonterm].nvals > old_nvals
+                    else:
+                        result[nonterm] = matrix.dup()
+                        has_changed |= matrix.nvals > 0
+        return set([(from_node, to_node) for from_node, to_node, _ in result.get(cfg.start_symbol, [])])
+
+# if __name__ == '__main__':
+#     grammar = GrammarWrapper.from_text(['S A B', 'S A C', 'C S B', 'A a', 'B b'])
+#     graph = GraphWrapper.from_text(['1 a 2', '2 a 0', '0 a 1', '0 b 3', '3 b 0'])
+#     print(graph.cfpq_matrices(grammar.cfg))
