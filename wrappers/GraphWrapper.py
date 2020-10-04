@@ -211,27 +211,15 @@ class GraphWrapper:
                     result[production.head] = matrix.dup()
         has_changed = True
         while has_changed:
-            matrices_product = {}
             for production in nonterm_productions:
                 if production.body[0] not in result or production.body[1] not in result:
                     continue
-                matrix1, matrix2 = result[production.body[0]], result[production.body[1]]
-                matrix3 = matrices_product.setdefault(production.head,
-                                                      Matrix.sparse(types.BOOL, self.matrix_size, self.matrix_size))
-                for i, col_num, _ in matrix1:
-                    for row_num, j, _ in matrix2:
-                        if col_num == row_num:
-                            matrix3[i, j] = True
-            has_changed = False
-            with semiring.LOR_LAND_BOOL:
-                for nonterm, matrix in matrices_product.items():
-                    if nonterm in result:
-                        old_nvals = result[nonterm].nvals
-                        result[nonterm] += matrix
-                        has_changed |= result[nonterm].nvals > old_nvals
-                    else:
-                        result[nonterm] = matrix.dup()
-                        has_changed |= matrix.nvals > 0
+                if production.head not in result:
+                    result[production.head] = Matrix.sparse(types.BOOL, self.matrix_size, self.matrix_size)
+                old_nvals, has_changed = result[production.head].nvals, False
+                result[production.head] += result[production.body[0]] @ result[production.body[1]]
+                has_changed |= result[production.head].nvals != old_nvals
+
         return set([(from_node, to_node) for from_node, to_node, _ in result.get(cfg.start_symbol, [])])
 
 # if __name__ == '__main__':
