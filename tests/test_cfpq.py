@@ -36,3 +36,4 @@ def test_hellings(suite):
     grammar, graph, expected = suite['grammar'], suite['graph'], suite['expected']
     assert graph.cfpq_hellings(grammar.cfg) == expected
     assert graph.cfpq_matrices(grammar.cfg) == expected
+    assert graph.cfpq_tensors(grammar.cfg) == expected
