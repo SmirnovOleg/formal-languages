@@ -256,8 +256,3 @@ class GraphWrapper:
                         has_changed = True
                     matrix[i_graph, j_graph] = True
         return set([(i, j) for i, j, _ in result.label_to_bool_matrix.get(cfg.start_symbol, [])])
-
-# if __name__ == '__main__':
-#     grammar = GrammarWrapper.from_text(['S a S b', 'S a b'])
-#     graph = GraphWrapper.from_text(['1 a 2', '2 a 0', '0 a 1', '0 b 3', '3 b 0'])
-#     print(graph.cfpq_tensors(grammar.cfg))
