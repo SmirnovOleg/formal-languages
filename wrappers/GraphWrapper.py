@@ -1,13 +1,15 @@
 from collections import deque
 from dataclasses import dataclass
 from itertools import chain
-from typing import Tuple, Dict, List, Set, Optional
+from typing import Tuple, Dict, List, Set, Optional, Any
 
 from pyformlang.cfg import CFG, Terminal, Variable
 from pyformlang.finite_automaton import State, Symbol, NondeterministicFiniteAutomaton
 from pygraphblas import Matrix, semiring
 from pygraphblas import binaryop
 from pygraphblas import types
+
+from wrappers import GrammarWrapper
 
 Indices = List[int]
 
@@ -16,20 +18,16 @@ Indices = List[int]
 class Edge:
     node_from: int
     node_to: int
-    label: str
+    label: Any
 
 
 class GraphWrapper:
-    label_to_bool_matrix: Dict[str, Matrix] = {}
-    vertices: Set[int]
-    start_states: Indices
-    final_states: Indices
 
     def __init__(self, edges: List[Edge],
-                 start_states: Optional[Indices] = None,
-                 final_states: Optional[Indices] = None):
-        label_to_edges: Dict[str, Tuple[Indices, Indices]] = {}
-        label_to_bool_matrix: Dict[str, Matrix] = {}
+                 start_states: Optional[Set[int]] = None,
+                 final_states: Optional[Set[int]] = None):
+        label_to_edges: Dict[Any, Tuple[Indices, Indices]] = {}
+        label_to_bool_matrix: Dict[Any, Matrix] = {}
         self.vertices = set()
         for edge in edges:
             I, J = label_to_edges.setdefault(edge.label, ([], []))
@@ -38,15 +36,16 @@ class GraphWrapper:
             self.vertices.add(edge.node_from)
             self.vertices.add(edge.node_to)
         max_size = 0 if not self.vertices else max(self.vertices) + 1
+        self.matrix_size = max_size
         for label, (I, J) in label_to_edges.items():
             label_to_bool_matrix[label] = Matrix.from_lists(I=I, J=J, V=[True] * len(I),
                                                             ncols=max_size, nrows=max_size, typ=types.BOOL)
         self.label_to_bool_matrix = label_to_bool_matrix
         if start_states is None:
-            start_states = list(self.vertices)
+            start_states = self.vertices
         self.start_states = start_states
         if final_states is None:
-            final_states = list(self.vertices)
+            final_states = self.vertices
         self.final_states = final_states
 
     @classmethod
@@ -69,9 +68,16 @@ class GraphWrapper:
         return cls(edges)
 
     @classmethod
-    def _from_label_to_bool_matrix(cls, label_to_bool_matrix: Dict[str, Matrix]):
+    def empty(cls):
+        return cls(edges=[], start_states=set(), final_states=set())
+
+    @classmethod
+    def _from_label_to_bool_matrix(cls, label_to_bool_matrix: Dict[Any, Matrix]):
         instance = cls(edges=[])
         instance.label_to_bool_matrix = label_to_bool_matrix
+        instance.matrix_size = instance.vertices_num
+        for _, matrix in instance.label_to_bool_matrix.items():
+            matrix.resize(instance.matrix_size, instance.matrix_size)
         return instance
 
     @property
@@ -84,11 +90,11 @@ class GraphWrapper:
         return {label: matrix.nvals for label, matrix in self.label_to_bool_matrix.items()}
 
     def kronecker_product(self, other):
-        label_to_kronecker_product: Dict[str, Matrix] = {}
-        step = other.vertices_num
+        label_to_kronecker_product: Dict[Any, Matrix] = {}
+        step = other.matrix_size
         empty_matrix = Matrix.sparse(typ=types.BOOL, nrows=step, ncols=step)
         for label, matrix in self.label_to_bool_matrix.items():
-            other_matrix: Matrix = other.label_to_bool_matrix.get(label, empty_matrix)
+            other_matrix: Matrix = other.label_to_bool_matrix.get(label, empty_matrix.dup())
             result_matrix = matrix.kronecker(other=other_matrix, op=binaryop.TIMES)
             label_to_kronecker_product[label] = result_matrix
         intersection = GraphWrapper._from_label_to_bool_matrix(label_to_kronecker_product)
@@ -149,24 +155,25 @@ class GraphWrapper:
                 nfa.add_transition(states[i], symbols[label], states[j])
         return nfa
 
-    def cfpq(self, cfg: CFG) -> Set[Tuple[int, int]]:
+    def cfpq_hellings(self, cfg: CFG) -> Set[Tuple[int, int]]:
         result: Dict[Variable, Matrix] = {}
         working_queue = deque()
-
         if cfg.generate_epsilon():
             result[cfg.start_symbol] = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
             for v in self.vertices:
                 result[cfg.start_symbol][v, v] = True
                 working_queue.append((v, v, cfg.start_symbol))
         cfg = cfg.to_normal_form()
-
-        for label, matrix in self.label_to_bool_matrix.items():
-            for prod in cfg.productions:
-                if len(prod.body) == 1 and Terminal(label) == prod.body[0]:
-                    result[prod.head] = matrix
-                    for i, j, _ in zip(*matrix.to_lists()):
-                        working_queue.append((i, j, prod.head))
-
+        with semiring.LOR_LAND_BOOL:
+            for label, matrix in self.label_to_bool_matrix.items():
+                for prod in cfg.productions:
+                    if len(prod.body) == 1 and Terminal(label) == prod.body[0]:
+                        if prod.head in result:
+                            result[prod.head] += matrix.dup()
+                        else:
+                            result[prod.head] = matrix.dup()
+                        for i, j, _ in matrix:
+                            working_queue.append((i, j, prod.head))
         while len(working_queue) != 0:
             node_from, node_to, var = working_queue.popleft()
             update = []
@@ -196,7 +203,64 @@ class GraphWrapper:
                     empty_matrix = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
                     result[var] = empty_matrix
                     result[var][node_from, node_to] = True
-        if cfg.start_symbol in result:
-            return set([(i, j) for i, j, _ in zip(*result[cfg.start_symbol].to_lists())])
-        else:
-            return set()
+        return set([(i, j) for i, j, _ in result.get(cfg.start_symbol, [])])
+
+    def cfpq_matrices(self, cfg: CFG) -> Set[Tuple[int, int]]:
+        result: Dict[Variable, Matrix] = {}
+        if cfg.generate_epsilon():
+            result[cfg.start_symbol] = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
+            for v in self.vertices:
+                result[cfg.start_symbol][v, v] = True
+        cfg = cfg.to_normal_form()
+        term_productions, nonterm_productions = set(), set()
+        for production in cfg.productions:
+            if len(production.body) == 2:
+                nonterm_productions.add(production)
+            else:
+                term_productions.add(production)
+        with semiring.LOR_LAND_BOOL:
+            for label, matrix in self.label_to_bool_matrix.items():
+                for production in term_productions:
+                    if Terminal(label) == production.body[0]:
+                        if production.head in result:
+                            result[production.head] += matrix.dup()
+                        else:
+                            result[production.head] = matrix.dup()
+            has_changed = True
+            while has_changed:
+                has_changed = False
+                for production in nonterm_productions:
+                    if production.body[0] not in result or production.body[1] not in result:
+                        continue
+                    if production.head not in result:
+                        result[production.head] = Matrix.sparse(types.BOOL, self.matrix_size, self.matrix_size)
+                    old_nvals = result[production.head].nvals
+                    result[production.head] += result[production.body[0]] @ result[production.body[1]]
+                    has_changed |= result[production.head].nvals != old_nvals
+        return set([(i, j) for i, j, _ in result.get(cfg.start_symbol, [])])
+
+    def cfpq_tensors(self, cfg: CFG):
+        grammar = GrammarWrapper(cfg)
+        empty_matrix = Matrix.sparse(types.BOOL, self.matrix_size, self.matrix_size)
+        result = {label: matrix.dup() for label, matrix in self.label_to_bool_matrix.items()}
+        for prod in cfg.productions:
+            if not prod.body:
+                result[prod.head] = empty_matrix.dup()
+                for v in self.vertices:
+                    result[prod.head][v, v] = True
+        result = GraphWrapper._from_label_to_bool_matrix(result)
+        has_changed = True
+        while has_changed:
+            tensor_product = grammar.rfa.kronecker_product(result)
+            closure = tensor_product.build_closure_by_squaring()
+            has_changed = False
+            for i, j, _ in closure:
+                if i in tensor_product.start_states and j in tensor_product.final_states:
+                    i_graph, j_graph = i % result.matrix_size, j % result.matrix_size
+                    i_rfa, j_rfa = i // result.matrix_size, j // result.matrix_size
+                    var = grammar.production_by_vertices[i_rfa, j_rfa].head.value
+                    matrix = result.label_to_bool_matrix.setdefault(var, empty_matrix.dup())
+                    if not matrix.get(i_graph, j_graph, False):
+                        has_changed = True
+                    matrix[i_graph, j_graph] = True
+        return set([(i, j) for i, j, _ in result.label_to_bool_matrix.get(cfg.start_symbol, [])])

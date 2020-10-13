@@ -1,16 +1,21 @@
 from typing import List
 
 from pyformlang.cfg import Variable, Terminal, CFG, Production
+from pygraphblas import types, Matrix
+
+import wrappers
 
 
 class GrammarWrapper:
-    cfg: CFG
 
     def __init__(self, cfg: CFG, to_normal_form=False):
         if to_normal_form:
             self.cfg = cfg.to_normal_form()
         else:
             self.cfg = cfg
+        rfa, production_by_vertices = self.__calculate_rfa()
+        self.rfa = rfa
+        self.production_by_vertices = production_by_vertices
 
     @classmethod
     def from_text(cls, text: List[str]):
@@ -40,6 +45,22 @@ class GrammarWrapper:
     def from_file(cls, path_to_file: str):
         with open(path_to_file, 'r') as file:
             return cls.from_text(file.readlines())
+
+    def __calculate_rfa(self):
+        rfa = wrappers.GraphWrapper.empty()
+        rfa.matrix_size = sum([len(prod.body) + 1 for prod in self.cfg.productions])
+        empty_matrix = Matrix.sparse(types.BOOL, rfa.matrix_size, rfa.matrix_size)
+        production_by_vertices, cnt = {}, 0
+        for prod in self.cfg.productions:
+            rfa.start_states.add(cnt)
+            production_by_vertices[cnt, cnt + len(prod.body)] = prod
+            for var in prod.body:
+                matrix = rfa.label_to_bool_matrix.setdefault(var.value, empty_matrix.dup())
+                matrix[cnt, cnt + 1] = True
+                cnt += 1
+            rfa.final_states.add(cnt)
+            cnt += 1
+        return rfa, production_by_vertices
 
     def accepts(self, word: str) -> bool:
         size = len(word)
