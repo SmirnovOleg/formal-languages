@@ -50,4 +50,4 @@ def suite(request):
 def test_cfpq(suite):
     grammar, graph, algo, expected = suite['grammar'], suite['graph'], suite['algo'], suite['expected']
     solver = graph.__getattribute__(f'cfpq_{algo}')
-    assert solver(grammar.cfg) == expected
+    assert solver(grammar) == expected

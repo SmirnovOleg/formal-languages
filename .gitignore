@@ -48,3 +48,4 @@ fabric.properties
 
 *.pyc
 tests/.big_data
+tests/big_cfpq_data

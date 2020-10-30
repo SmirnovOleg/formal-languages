@@ -21,7 +21,7 @@ class RegexGraphWrapper(GraphWrapper):
         self.dfa_state_to_idx = state_to_idx
         start_states = [self.dfa_state_to_idx[state] for state in self.dfa.start_states]
         final_states = [self.dfa_state_to_idx[state] for state in self.dfa.final_states]
-        super().__init__(edges, start_states, final_states)
+        super().__init__(edges, set(start_states), set(final_states))
 
     @classmethod
     def from_regex(cls, regex: str, is_python_regex=True):
