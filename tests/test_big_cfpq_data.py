@@ -16,8 +16,10 @@ except FileNotFoundError:
     test_suites = []
 
 csv_path = os.path.join(data_path, 'benchmark.csv')
-csv_fieldnames = ['suite', 'graph', 'grammar', 'algo', 'reachable_pairs',
-                  'same_cg_time_ms', 'nf_cg_time_ms', 'minimized_cg_time_ms']
+csv_fieldnames = ['suite', 'graph', 'grammar',
+                  'cnf_load_time', 'rfa_load_time',
+                  'cnf_hellings_time', 'cnf_matrices_time',
+                  'cfg_tensors_time', 'cnf_tensors_time', 'rfa_tensors_time']
 iterations_num = 1
 
 
@@ -56,13 +58,16 @@ def benchmark_suite(request):
     }
 
 
-def test_cfpq_big_data(benchmark_suite):
+@pytest.mark.skip(reason="there is no need to run benchmarks each time")
+def test_big_cfpq_data(benchmark_suite):
     suite_name = benchmark_suite['suite']
     graphs_paths = benchmark_suite['graphs_paths']
     grammars_paths = benchmark_suite['grammars_paths']
 
     for graph_path, grammar_path in product(graphs_paths, grammars_paths):
-        print(f'Start processing graph <{Path(graph_path).name}>, query grammar <{Path(grammar_path).name}>')
+        graph_name = Path(graph_path).name
+        grammar_name = Path(grammar_path).name
+        print(f'Start processing graph <{graph_name}>, query grammar <{grammar_name}>')
         graph = GraphWrapper.from_file(graph_path)
 
         cnf_load_time, grammar = timeit(GrammarWrapper.from_file)(grammar_path, contains_regexes=True)
@@ -75,3 +80,18 @@ def test_cfpq_big_data(benchmark_suite):
         rfa_tensors_time, rfa_tensors_pairs = timeit(graph._cfpq_tensors_from_rfa)(rfa)
 
         assert hellings_pairs == matrices_pairs == cfg_tensors_pairs == cnf_tensors_pairs == rfa_tensors_pairs
+
+        with open(csv_path, 'a', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=csv_fieldnames)
+            writer.writerow({
+                'suite': suite_name,
+                'graph': graph_name,
+                'grammar': grammar_name,
+                'cnf_load_time': cnf_load_time,
+                'rfa_load_time': rfa_load_time,
+                'cnf_hellings_time': cnf_hellings_time,
+                'cnf_matrices_time': cnf_matrices_time,
+                'cfg_tensors_time': cfg_tensors_time,
+                'cnf_tensors_time': cnf_tensors_time,
+                'rfa_tensors_time': rfa_tensors_time
+            })

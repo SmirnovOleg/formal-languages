@@ -40,14 +40,29 @@ graphs = {
 def suite(request):
     grammar, graph, algo, expected = request.param
     return {
-        "grammar": GrammarWrapper.from_text(grammar),
+        "grammar_source_text": grammar,
         "graph": GraphWrapper.from_text(graph),
         "expected": set(expected),
         "algo": algo
     }
 
 
-def test_cfpq(suite):
-    grammar, graph, algo, expected = suite['grammar'], suite['graph'], suite['algo'], suite['expected']
+def test_cfpq_without_regexes(suite):
+    graph, algo, expected = suite['graph'], suite['algo'], suite['expected']
+    grammar = GrammarWrapper.from_text(suite['grammar_source_text'], contains_regexes=False)
     solver = graph.__getattribute__(f'cfpq_{algo}')
     assert solver(grammar) == expected
+
+
+def test_cfpq_with_regexes(suite):
+    graph, algo, expected = suite['graph'], suite['algo'], suite['expected']
+    grammar = GrammarWrapper.from_text(suite['grammar_source_text'], contains_regexes=True)
+    solver = graph.__getattribute__(f'cfpq_{algo}')
+    assert solver(grammar) == expected
+
+
+def test_cfpq_tensors_from_rfa(suite):
+    graph, expected = suite['graph'], suite['expected']
+    from wrappers import RFA
+    rfa = RFA.from_text(suite['grammar_source_text'])
+    assert graph._cfpq_tensors_from_rfa(rfa) == expected

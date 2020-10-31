@@ -61,7 +61,7 @@ class GraphWrapper:
     def from_text(cls, text: List[str]):
         edges = []
         for line in text:
-            vertex_from, label, vertex_to = line.split(' ')
+            vertex_from, label, vertex_to = line.strip().split(' ')
             edges.append(Edge(node_from=int(vertex_from),
                               node_to=int(vertex_to),
                               label=label))

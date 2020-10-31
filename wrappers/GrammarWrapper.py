@@ -1,13 +1,12 @@
 from typing import List, Dict
 
 from pyformlang.cfg import Variable, Terminal, CFG, Production
-from pyformlang.finite_automaton import EpsilonNFA, State
+from pyformlang.finite_automaton import State
 from pyformlang.regular_expression import Regex
-
-__var_state_counter = 0
 
 
 class GrammarWrapper:
+    __var_state_counter = 0
 
     def __init__(self, cfg: CFG):
         self.cfg = cfg
@@ -21,8 +20,8 @@ class GrammarWrapper:
         start_var = None
         if contains_regexes:
             for line in text:
-                raw_head, raw_body = line.split(' ', 1)
-                regex = Regex(raw_body)
+                raw_head, *raw_body = line.strip().split(' ', 1)
+                regex = Regex(' '.join(raw_body))
                 head = Variable(raw_head)
                 if start_var is None:
                     start_var = head
@@ -32,7 +31,7 @@ class GrammarWrapper:
                 prods.update(cur_cfg.productions)
         else:
             for line in text:
-                raw_head, *raw_body = line.split()
+                raw_head, *raw_body = line.strip().split()
                 if start_var is None:
                     start_var = Variable(raw_head)
                 head = Variable(raw_head)
@@ -60,34 +59,35 @@ class GrammarWrapper:
 
     @classmethod
     def _create_cfg_from_regex(cls, head: Variable, regex: Regex) -> CFG:
-        nfa: EpsilonNFA = regex.to_epsilon_nfa().minimize()
-        transitions = nfa._transition_function._transitions
+        dfa = regex.to_epsilon_nfa().to_deterministic().minimize()
+        transitions = dfa._transition_function._transitions
         state_to_var: Dict[State, Variable] = {}
         productions, terms, vars = set(), set(), set()
-        global __var_state_counter
-        for state in nfa.states:
-            state_to_var[state] = Variable(f'{state}:{__var_state_counter}')
-            __var_state_counter += 1
+        for state in dfa.states:
+            state_to_var[state] = Variable(f'{state}:{cls.__var_state_counter}')
+            cls.__var_state_counter += 1
         vars.update(state_to_var.values())
-        for start_state in nfa.start_states:
+        for start_state in dfa.start_states:
             productions.add(Production(head, [state_to_var[start_state]]))
         for state_from in transitions:
             for edge_symb in transitions[state_from]:
                 state_to = transitions[state_from][edge_symb]
                 current_prod_head = state_to_var[state_from]
                 current_prod_body = []
-                if len(edge_symb) == 1 and edge_symb.islower():
-                    term = Terminal(edge_symb)
+                if edge_symb.value != 'eps' and edge_symb.value.islower():
+                    term = Terminal(edge_symb.value)
                     terms.add(term)
                     current_prod_body.append(term)
-                elif any(letter.isupper() for letter in edge_symb):
-                    var = Variable(edge_symb)
+                elif any(letter.isupper() for letter in edge_symb.value):
+                    var = Variable(edge_symb.value)
                     vars.add(var)
                     current_prod_body.append(var)
                 current_prod_body.append(state_to_var[state_to])
                 productions.add(Production(current_prod_head, current_prod_body))
-                if state_to in nfa.final_states:
+                if state_to in dfa.final_states:
                     productions.add(Production(state_to_var[state_to], []))
+        if not productions:
+            return CFG(vars, terms, head, {Production(head, [])})
         return CFG(vars, terms, head, productions)
 
     def get_weak_cnf(self) -> CFG:
