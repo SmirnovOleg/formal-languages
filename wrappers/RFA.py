@@ -38,8 +38,8 @@ class RFA:
         eps_productions = []
         productions_with_dfa = []
         for line in text:
-            raw_head, *raw_body = line.split(' ', 1)
-            regex = Regex(' '.join(raw_body))
+            raw_head, *raw_body = line.strip().split(' ', 1)
+            regex = Regex(' '.join(raw_body).replace('eps', 'epsilon'))
             head = Variable(raw_head)
             if start_symbol is None:
                 start_symbol = head
@@ -51,6 +51,7 @@ class RFA:
         import wrappers.GraphWrapper
         rfa_graph = wrappers.GraphWrapper.empty()
         rfa_graph.matrix_size = sum([len(dfa.states) for _, dfa in productions_with_dfa])
+        rfa_graph.vertices = set()
         empty_matrix = Matrix.sparse(types.BOOL, rfa_graph.matrix_size, rfa_graph.matrix_size)
         head_by_start_final_pair = {}
         total_states_counter = 0
@@ -61,6 +62,7 @@ class RFA:
             for state in dfa.states:
                 num_by_state[state] = total_states_counter
                 total_states_counter += 1
+            rfa_graph.vertices.update(num_by_state.values())
 
             for start_state in dfa.start_states:
                 rfa_graph.start_states.add(num_by_state[start_state])
@@ -73,10 +75,6 @@ class RFA:
                     state_to = transitions[state_from][edge_symb]
                     matrix = rfa_graph.label_to_bool_matrix.setdefault(edge_symb, empty_matrix.dup())
                     matrix[num_by_state[state_from], num_by_state[state_to]] = True
-
-        rfa_graph.matrix_size = total_states_counter
-        for matrix in rfa_graph.label_to_bool_matrix.values():
-            matrix.resize(total_states_counter, total_states_counter)
 
         return cls(rfa_graph, head_by_start_final_pair, eps_productions, start_symbol)
 

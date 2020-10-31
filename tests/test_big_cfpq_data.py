@@ -14,7 +14,6 @@ try:
     test_suites = [name for name in os.listdir(data_path) if os.path.isdir(os.path.join(data_path, name))]
 except FileNotFoundError:
     test_suites = []
-
 csv_path = os.path.join(data_path, 'benchmark.csv')
 csv_fieldnames = ['suite', 'graph', 'grammar',
                   'cnf_load_time', 'rfa_load_time',
@@ -58,7 +57,7 @@ def benchmark_suite(request):
     }
 
 
-@pytest.mark.skip(reason="there is no need to run benchmarks each time")
+# @pytest.mark.skip(reason="there is no need to run benchmarks each time")
 def test_big_cfpq_data(benchmark_suite):
     suite_name = benchmark_suite['suite']
     graphs_paths = benchmark_suite['graphs_paths']
@@ -79,7 +78,10 @@ def test_big_cfpq_data(benchmark_suite):
         cnf_tensors_time, cnf_tensors_pairs = timeit(graph.cfpq_tensors)(grammar, from_wcnf=True)
         rfa_tensors_time, rfa_tensors_pairs = timeit(graph._cfpq_tensors_from_rfa)(rfa)
 
-        assert hellings_pairs == matrices_pairs == cfg_tensors_pairs == cnf_tensors_pairs == rfa_tensors_pairs
+        assert hellings_pairs == matrices_pairs
+        assert matrices_pairs == cfg_tensors_pairs
+        assert cfg_tensors_pairs == cnf_tensors_pairs
+        assert cnf_tensors_pairs == rfa_tensors_pairs
 
         with open(csv_path, 'a', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=csv_fieldnames)

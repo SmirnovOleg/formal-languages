@@ -246,6 +246,11 @@ class GraphWrapper:
     def _cfpq_tensors_from_rfa(self, rfa):
         empty_matrix = Matrix.sparse(types.BOOL, self.matrix_size, self.matrix_size)
         result = {label: matrix.dup() for label, matrix in self.label_to_bool_matrix.items()}
+        for (state_from, state_to), head in rfa.head_by_start_final_pair.items():
+            if state_from == state_to:
+                result[head] = empty_matrix.dup()
+                for v in self.vertices:
+                    result[head][v, v] = True
         for prod in rfa.eps_productions:
             result[prod.head] = empty_matrix.dup()
             for v in self.vertices:
