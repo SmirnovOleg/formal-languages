@@ -73,10 +73,15 @@ def test_big_cfpq_data(benchmark_suite):
         rfa_load_time, rfa = timeit(RFA.from_file)(grammar_path)
 
         cnf_hellings_time, hellings_pairs = timeit(graph.cfpq_hellings)(grammar)
+        print('Hellings done')
         cnf_matrices_time, matrices_pairs = timeit(graph.cfpq_matrices)(grammar)
+        print('Matrices done')
         cfg_tensors_time, cfg_tensors_pairs = timeit(graph.cfpq_tensors)(grammar, from_wcnf=False)
+        print('Tensors CFG done')
         cnf_tensors_time, cnf_tensors_pairs = timeit(graph.cfpq_tensors)(grammar, from_wcnf=True)
+        print('Tensors CNF done')
         rfa_tensors_time, rfa_tensors_pairs = timeit(graph._cfpq_tensors_from_rfa)(rfa)
+        print('Tensors RFA done')
 
         assert hellings_pairs == matrices_pairs
         assert matrices_pairs == cfg_tensors_pairs
