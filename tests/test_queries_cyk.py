@@ -11,7 +11,7 @@ keywords = [
     'or', 'and', 'not',
     'has_label', 'is_start', 'is_final',
     'alt', 'concat', 'star', 'plus', 'option', 'term', 'var',
-    '(', ')', ';', '"', ',', 'to'
+    '(', ')', ';', '"', ',', 'to', '{', '}'
 ]
 
 variables = {
@@ -19,7 +19,7 @@ variables = {
     'PATTERN', 'OBJECTIVE', 'GRAPH', 'OTHER_GRAPH', 'ANOTHER_GRAPH',
     'VERTICES', 'SET', 'EDGES', 'PREDICATE', 'VERTEX_IDENT', 'EDGE_IDENT',
     'BOOL_EXPR', 'OTHER_BOOL_EXPR', 'ANOTHER_BOOL_EXPR', 'ATOMIC_BOOL_EXPR',
-    'OTHER_PATTERN', 'ANOTHER_PATTERN', 'USER_EPS', 'NON_TERM'
+    'OTHER_PATTERN', 'ANOTHER_PATTERN', 'USER_EPS', 'NON_TERM', 'TAIL'
 }
 
 grammar = GrammarWrapper.from_file('../query_language_grammar.txt',
@@ -28,7 +28,7 @@ grammar = GrammarWrapper.from_file('../query_language_grammar.txt',
 
 
 def analyze_syntax(script: str):
-    for spec in ['\n', ',', '"', '(', ')', ';']:
+    for spec in ['\n', ',', '"', '(', ')', ';', '{', '}']:
         script = script.replace(spec, f' {spec} ')
     result = []
     for word in script.split():
@@ -40,16 +40,30 @@ def analyze_syntax(script: str):
 
 
 @pytest.fixture(scope="function", params=[
-    ('''connect "/home/oleg/db"; ''', True),
-    ('''connect "/home/oleg/db"  ''', False),
-    ('''select (filter ((u, e, v) satisfy (is_start u)) edges) (name g); ''', True),
-    ('''select (filter ((u, e, v) satisfy (is_final v)) edges) (name g); ''', True),
-    ('''select (filter ((U, E, V) satisfy (E has_label "LABEL")) edges) (name g); ''', True),
-    ('''select (filter ((u, e, v) satisfy (is_start u and e has_label "a" or is_final v)) edges) (name g); ''', True),
-    ('''production var(S) to term(a); ''', True),
-    ('''production var(S) to (term(a) concat var(S) concat term(b) concat var(S)); ''', True),
-    ('''production var(S) to (term(a) concat var(S) concat term(b) concat var(S)) alt e; ''', True),
-    ('''production var(S) to (star(term(a)) concat option(var(S)) concat plus(term(b))); ''', True)
+    ('connect "/home/oleg/db";', True),
+    ('connect "/home/user.user/DB/myDB" ', False),
+    ('production var(S) to term(a);', True),
+    ('production var(S) to (term(a) concat var(S) concat term(b) concat var(S));', True),
+    ('production var(S) to (term(a) concat var(S) concat term(b) concat var(S)) alt e;', True),
+    ('production var(S) to (star(term(a)) concat option(var(S)) concat plus(term(b)));', True),
+    ('select (filter ((u, e, v) satisfy (is_start u), edges)) (name "g.txt");', True),
+    ('select (filter ((u, e, v) satisfy (is_final v), edges)) (name "g.txt");', True),
+    ('select (filter ((U, E, V) satisfy (not E has_label "LABEL"), edges)) (name "g.txt");', True),
+    ('select (filter ((u, e, v) satisfy (is_start u and e has_label "a" or is_final v), edges)) (name "g.txt");', True),
+    ('select (count edges) (name "g.txt");', True),
+    ('select (count (filter ((u, e, v) satisfy (is_start u), edges))) (name "g.txt");', True),
+    ('select (edges) (set_start_and_final (range(0; 10), none, name "g.txt"));', True),
+    ('select (edges) (set_start_and_final (set {0, 1, 2}, none, name "g.txt"));', True),
+    ('select (edges) (set_start_and_final (set {0, 1, 2}, set {2, 3}, name "g.txt"));', True),
+    ('select (edges) (set_start_and_final (none, none, query grammar));', True),
+    ('select (edges) (set_start_and_final (none, none, query term(a) alt term(b)));', True),
+    ('select (edges) (query grammar intersect name "fullgraph.txt");', True),
+    ('''
+        connect "/home/oleg/db";
+        production var(S) to (term(a) concat var(S) concat term(b) concat var(S));
+        production var(S) to e;
+        select (filter ((v1, e, v2) satisfy (is_start v1), edges)) (query grammar intersect name "fullgraph.txt");
+    ''', True),
 ])
 def suite(request):
     return {
