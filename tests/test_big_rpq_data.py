@@ -9,7 +9,7 @@ import pytest
 
 from wrappers import GraphWrapper, RegexGraphWrapper
 
-data_path = os.path.join(os.getcwd(), 'tests/.big_data/')
+data_path = os.path.join(os.getcwd(), 'tests/big_rpq_data/')
 try:
     graphs_test_suites = [name for name in os.listdir(data_path)
                           if os.path.isdir(os.path.join(data_path, name))]
@@ -63,7 +63,7 @@ def benchmark_suite(request):
 
 
 @pytest.mark.skip(reason="there is no need to run benchmarks each time")
-def test_big_data(benchmark_suite):
+def test_big_rpq_data(benchmark_suite):
     graph: GraphWrapper = benchmark_suite['graph']
     regexes: List[RegexGraphWrapper] = benchmark_suite['regexes']
     graph_name, regexes_names = benchmark_suite['graph_name'], benchmark_suite['regexes_names']

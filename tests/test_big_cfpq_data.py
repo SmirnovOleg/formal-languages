@@ -57,7 +57,7 @@ def benchmark_suite(request):
     }
 
 
-# @pytest.mark.skip(reason="there is no need to run benchmarks each time")
+@pytest.mark.skip(reason="there is no need to run benchmarks each time")
 def test_big_cfpq_data(benchmark_suite):
     suite_name = benchmark_suite['suite']
     graphs_paths = benchmark_suite['graphs_paths']
