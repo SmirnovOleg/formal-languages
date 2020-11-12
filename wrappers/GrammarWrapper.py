@@ -15,7 +15,7 @@ class GrammarWrapper:
         self.wcnf = self.get_weak_cnf()
 
     @classmethod
-    def from_text(cls, text: List[str], use_python_regexes_if_necessary=False):
+    def from_text(cls, text: List[str], use_python_regexes_if_necessary=False, variables=None):
         vars, terms, prods = set(), set(), set()
         start_var = None
         for line in text:
@@ -30,7 +30,7 @@ class GrammarWrapper:
                 head = Variable(raw_head)
                 if start_var is None:
                     start_var = head
-                cur_cfg = cls._create_cfg_from_regex(head, regex)
+                cur_cfg = cls._create_cfg_from_regex(head, regex, variables)
                 vars.update(cur_cfg.variables)
                 terms.update(cur_cfg.terminals)
                 prods.update(cur_cfg.productions)
@@ -44,7 +44,8 @@ class GrammarWrapper:
                 for element in raw_body:
                     if element == 'eps':
                         continue
-                    elif any(letter.isupper() for letter in element):
+                    elif (not variables and any(letter.isupper() for letter in element)
+                          or variables and element in variables):
                         var = Variable(element)
                         vars.add(var)
                         body.append(var)
@@ -57,12 +58,12 @@ class GrammarWrapper:
         return cls(cfg)
 
     @classmethod
-    def from_file(cls, path_to_file: str, use_python_regexes_if_necessary=False):
+    def from_file(cls, path_to_file: str, use_python_regexes_if_necessary=False, variables=None):
         with open(path_to_file, 'r') as file:
-            return cls.from_text(file.readlines(), use_python_regexes_if_necessary)
+            return cls.from_text(file.readlines(), use_python_regexes_if_necessary, variables)
 
     @classmethod
-    def _create_cfg_from_regex(cls, head: Variable, regex: Regex) -> CFG:
+    def _create_cfg_from_regex(cls, head: Variable, regex: Regex, variables=None) -> CFG:
         dfa = regex.to_epsilon_nfa().to_deterministic().minimize()
         transitions = dfa._transition_function._transitions
         state_to_var: Dict[State, Variable] = {}
@@ -78,7 +79,8 @@ class GrammarWrapper:
                 state_to = transitions[state_from][edge_symb]
                 current_prod_head = state_to_var[state_from]
                 current_prod_body = []
-                if edge_symb.value.isupper():
+                if (not variables and edge_symb.value.isupper()
+                        or variables and edge_symb.value in variables):
                     var = Variable(edge_symb.value)
                     vars.add(var)
                     current_prod_body.append(var)
