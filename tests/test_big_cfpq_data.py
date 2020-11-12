@@ -69,7 +69,7 @@ def test_big_cfpq_data(benchmark_suite):
         print(f'Start processing graph <{graph_name}>, query grammar <{grammar_name}>')
         graph = GraphWrapper.from_file(graph_path)
 
-        cnf_load_time, grammar = timeit(GrammarWrapper.from_file)(grammar_path, contains_regexes=True)
+        cnf_load_time, grammar = timeit(GrammarWrapper.from_file)(grammar_path)
         print(f'CNF loaded, {cnf_load_time} ms')
         rfa_load_time, rfa = timeit(RFA.from_file)(grammar_path)
         print(f'RFA loaded, {rfa_load_time} ms')
