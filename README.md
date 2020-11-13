@@ -62,9 +62,9 @@
 <b>USER_EPS -> e</b>
 
 -- Possible types: path, string or int
-<b>PATH -> [./a-zA-Z0-9]*</b>
-<b>STRING -> [a-zA-Z][.a-zA-Z0-9]*</b>
-<b>INT -> [0-9]*</b>
+<b>PATH -> [/_a-zA-Z0-9]+</b>
+<b>STRING -> [_a-zA-Z0-9]+</b>
+<b>INT -> [0-9]+</b>
 </pre>
 
 #### Examples 
