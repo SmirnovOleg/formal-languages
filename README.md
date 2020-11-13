@@ -53,7 +53,7 @@
 <b>ATOMIC_BOOL_EXPR -> EDGE_IDENT has_label " STRING " | is_start VERTEX_IDENT | is_final VERTEX_IDENT</b>
 
 -- Patterns (regexes) support `alt`, `concat`, `star`, `plus` and `option` operators
--- Endpoints are the `term`s, `var`s or `e` (user's Epsilon)
+-- Endpoints can be represented as `term`, `var` or `e` (user's Epsilon)
 <b>PATTERN -> PATTERN alt OTHER_PATTERN | OTHER_PATTERN</b>
 <b>OTHER_PATTERN -> OTHER_PATTERN concat ANOTHER_PATTERN | ANOTHER_PATTERN</b>
 <b>ANOTHER_PATTERN -> star ( ANOTHER_PATTERN ) | plus ( ANOTHER_PATTERN ) | option ( ANOTHER_PATTERN )</b>
