@@ -74,7 +74,7 @@
  - Add grammar `S -> a S b S | eps`:
    - `production var(S) to (term(a) concat var(S) concat term(b) concat var(S)) alt e;`
  - Extract edges with label "ABC" from the graph located in "path/to/db/graph":
-   - `select (filter ((u, e, v) satisfy (not e has_label "ABC"), edges)) (name "graph.txt");`
+   - `select (filter ((u, e, v) satisfy (e has_label "ABC"), edges)) (name "graph.txt");`
  - Count all the edges from the intersection of accumulated grammar (as RSM) and graph "graph":
    - `select (count edges) (query grammar intersect name "graph.txt");`
  - Select edges from the graph "graph" with start state in vertex {0} and final states in vertices {2, 3}:
