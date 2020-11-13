@@ -73,20 +73,20 @@
    - `connect "/home/user/prog/db";`
  - Add grammar `S -> a S b S | eps`:
    - `production var(S) to (term(a) concat var(S) concat term(b) concat var(S)) alt e;`
- - Extract edges with label "ABC" from the graph located in "graph.txt":
+ - Extract edges with label "ABC" from the graph located in "path/to/db/graph":
    - `select (filter ((u, e, v) satisfy (not e has_label "ABC"), edges)) (name "graph.txt");`
- - Count all the edges from the intersection of accumulated grammar (as RSM) and graph "graph.txt":
+ - Count all the edges from the intersection of accumulated grammar (as RSM) and graph "graph":
    - `select (count edges) (query grammar intersect name "graph.txt");`
- - Select edges from the graph "graph.txt" with start state in vertex {0} and final states in vertices {2, 3}:
+ - Select edges from the graph "graph" with start state in vertex {0} and final states in vertices {2, 3}:
    - `select (edges) (set_start_and_final (set {0}, set {2, 3}, name "g.txt"));`
  - Complex script example:
     ```
     connect "/home/user/db";
     production var(S) to (term(a) concat var(S) concat term(b));
     production var(S) to e;
-    select (filter ((v1, e, v2) satisfy (is_start v1), edges)) (query grammar intersect name "fullgraph.txt");
-    select (filter ((u, e, v) satisfy (is_start u and e has_label "a" or is_final v), edges)) (name "g.txt");
-    select (count edges) (query grammar intersect name "g.txt");
+    select (filter ((v1, e, v2) satisfy (is_start v1), edges)) (query grammar intersect name "fullgraph");
+    select (filter ((u, e, v) satisfy (is_start u and e has_label "a" or is_final v), edges)) (name "g");
+    select (count edges) (query grammar intersect name "g");
     ```
  
 ### Benchmarks

@@ -59,7 +59,7 @@ ANOTHER_PATTERN NON_TERM
 
 NON_TERM var ( STRING )
 
-PATH [./a-zA-Z0-9]*
-STRING [a-zA-Z][.a-zA-Z0-9]*
-INT [0-9]*
+PATH [/_a-zA-Z0-9]+
+STRING [_a-zA-Z0-9]+
+INT [0-9]+
 USER_EPS e
