@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from itertools import chain
 from typing import Tuple, Dict, List, Set, Optional, Any
 
-from pyformlang.cfg import CFG, Terminal, Variable
+from pyformlang.cfg import Terminal, Variable
 from pyformlang.finite_automaton import State, Symbol, NondeterministicFiniteAutomaton
 from pygraphblas import Matrix, semiring
 from pygraphblas import binaryop
@@ -61,7 +61,7 @@ class GraphWrapper:
     def from_text(cls, text: List[str]):
         edges = []
         for line in text:
-            vertex_from, label, vertex_to = line.split(' ')
+            vertex_from, label, vertex_to = line.strip().split(' ')
             edges.append(Edge(node_from=int(vertex_from),
                               node_to=int(vertex_to),
                               label=label))
@@ -155,18 +155,17 @@ class GraphWrapper:
                 nfa.add_transition(states[i], symbols[label], states[j])
         return nfa
 
-    def cfpq_hellings(self, cfg: CFG) -> Set[Tuple[int, int]]:
+    def cfpq_hellings(self, grammar: GrammarWrapper) -> Set[Tuple[int, int]]:
         result: Dict[Variable, Matrix] = {}
         working_queue = deque()
-        if cfg.generate_epsilon():
-            result[cfg.start_symbol] = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
+        if grammar.generate_epsilon:
+            result[grammar.cfg.start_symbol] = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
             for v in self.vertices:
-                result[cfg.start_symbol][v, v] = True
-                working_queue.append((v, v, cfg.start_symbol))
-        cfg = cfg.to_normal_form()
+                result[grammar.cfg.start_symbol][v, v] = True
+                working_queue.append((v, v, grammar.cfg.start_symbol))
         with semiring.LOR_LAND_BOOL:
             for label, matrix in self.label_to_bool_matrix.items():
-                for prod in cfg.productions:
+                for prod in grammar.cnf.productions:
                     if len(prod.body) == 1 and Terminal(label) == prod.body[0]:
                         if prod.head in result:
                             result[prod.head] += matrix.dup()
@@ -179,7 +178,7 @@ class GraphWrapper:
             update = []
             for var_before, matrix in result.items():
                 for node_before, _ in matrix[:, node_from]:
-                    for prod in cfg.productions:
+                    for prod in grammar.cnf.productions:
                         if (len(prod.body) == 2
                                 and prod.body[0] == var_before
                                 and prod.body[1] == var
@@ -188,7 +187,7 @@ class GraphWrapper:
                             update.append((node_before, node_to, prod.head))
             for var_after, matrix in result.items():
                 for node_after, _ in matrix[node_to]:
-                    for prod in cfg.productions:
+                    for prod in grammar.cnf.productions:
                         if (len(prod.body) == 2
                                 and prod.body[0] == var
                                 and prod.body[1] == var_after
@@ -203,20 +202,19 @@ class GraphWrapper:
                     empty_matrix = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
                     result[var] = empty_matrix
                     result[var][node_from, node_to] = True
-        return set([(i, j) for i, j, _ in result.get(cfg.start_symbol, [])])
+        return set([(i, j) for i, j, _ in result.get(grammar.cfg.start_symbol, [])])
 
-    def cfpq_matrices(self, cfg: CFG) -> Set[Tuple[int, int]]:
+    def cfpq_matrices(self, grammar: GrammarWrapper) -> Set[Tuple[int, int]]:
         result: Dict[Variable, Matrix] = {}
-        if cfg.generate_epsilon():
-            result[cfg.start_symbol] = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
+        if grammar.generate_epsilon:
+            result[grammar.cfg.start_symbol] = Matrix.sparse(types.BOOL, self.vertices_num, self.vertices_num)
             for v in self.vertices:
-                result[cfg.start_symbol][v, v] = True
-        cfg = cfg.to_normal_form()
+                result[grammar.cfg.start_symbol][v, v] = True
         term_productions, nonterm_productions = set(), set()
-        for production in cfg.productions:
+        for production in grammar.cnf.productions:
             if len(production.body) == 2:
                 nonterm_productions.add(production)
-            else:
+            elif len(production.body) == 1:
                 term_productions.add(production)
         with semiring.LOR_LAND_BOOL:
             for label, matrix in self.label_to_bool_matrix.items():
@@ -237,30 +235,39 @@ class GraphWrapper:
                     old_nvals = result[production.head].nvals
                     result[production.head] += result[production.body[0]] @ result[production.body[1]]
                     has_changed |= result[production.head].nvals != old_nvals
-        return set([(i, j) for i, j, _ in result.get(cfg.start_symbol, [])])
+        return set([(i, j) for i, j, _ in result.get(grammar.cfg.start_symbol, [])])
 
-    def cfpq_tensors(self, cfg: CFG):
-        grammar = GrammarWrapper(cfg)
+    def cfpq_tensors(self, grammar: GrammarWrapper, from_wcnf=False) -> Set[Tuple[int, int]]:
+        current_cfg = grammar.wcnf if from_wcnf else grammar.cfg
+        import wrappers.RFA
+        rfa = wrappers.RFA.from_cfg(current_cfg)
+        return self._cfpq_tensors_from_rfa(rfa)
+
+    def _cfpq_tensors_from_rfa(self, rfa):
         empty_matrix = Matrix.sparse(types.BOOL, self.matrix_size, self.matrix_size)
         result = {label: matrix.dup() for label, matrix in self.label_to_bool_matrix.items()}
-        for prod in cfg.productions:
-            if not prod.body:
-                result[prod.head] = empty_matrix.dup()
+        for (state_from, state_to), head in rfa.head_by_start_final_pair.items():
+            if state_from == state_to:
+                result[head] = empty_matrix.dup()
                 for v in self.vertices:
-                    result[prod.head][v, v] = True
+                    result[head][v, v] = True
+        for prod in rfa.eps_productions:
+            result[prod.head] = empty_matrix.dup()
+            for v in self.vertices:
+                result[prod.head][v, v] = True
         result = GraphWrapper._from_label_to_bool_matrix(result)
         has_changed = True
         while has_changed:
-            tensor_product = grammar.rfa.kronecker_product(result)
+            tensor_product = rfa.graph.kronecker_product(result)
             closure = tensor_product.build_closure_by_squaring()
             has_changed = False
             for i, j, _ in closure:
                 if i in tensor_product.start_states and j in tensor_product.final_states:
                     i_graph, j_graph = i % result.matrix_size, j % result.matrix_size
                     i_rfa, j_rfa = i // result.matrix_size, j // result.matrix_size
-                    var = grammar.production_by_vertices[i_rfa, j_rfa].head.value
+                    var = rfa.head_by_start_final_pair[i_rfa, j_rfa]
                     matrix = result.label_to_bool_matrix.setdefault(var, empty_matrix.dup())
                     if not matrix.get(i_graph, j_graph, False):
                         has_changed = True
                     matrix[i_graph, j_graph] = True
-        return set([(i, j) for i, j, _ in result.label_to_bool_matrix.get(cfg.start_symbol, [])])
+        return set([(i, j) for i, j, _ in result.label_to_bool_matrix.get(rfa.start_symbol, [])])

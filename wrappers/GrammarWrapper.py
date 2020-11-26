@@ -1,66 +1,106 @@
-from typing import List
+from typing import List, Dict
 
 from pyformlang.cfg import Variable, Terminal, CFG, Production
-from pygraphblas import types, Matrix
-
-import wrappers
+from pyformlang.finite_automaton import State
+from pyformlang.regular_expression import Regex
 
 
 class GrammarWrapper:
+    __var_state_counter = 0
 
-    def __init__(self, cfg: CFG, to_normal_form=False):
-        if to_normal_form:
-            self.cfg = cfg.to_normal_form()
-        else:
-            self.cfg = cfg
-        rfa, production_by_vertices = self.__calculate_rfa()
-        self.rfa = rfa
-        self.production_by_vertices = production_by_vertices
+    def __init__(self, cfg: CFG):
+        self.cfg = cfg
+        self.generate_epsilon = cfg.generate_epsilon()
+        self.cnf = cfg.to_normal_form()
+        self.wcnf = self.get_weak_cnf()
 
     @classmethod
-    def from_text(cls, text: List[str]):
+    def from_text(cls, text: List[str], contains_regexes=False):
         vars, terms, prods = set(), set(), set()
         start_var = None
-        for line in text:
-            raw_head, *raw_body = line.split()
-            if start_var is None:
-                start_var = Variable(raw_head)
-            head = Variable(raw_head)
-            vars.add(head)
-            body = []
-            for element in raw_body:
-                if element.islower():
-                    term = Terminal(element)
-                    terms.add(term)
-                    body.append(term)
-                else:
-                    var = Variable(element)
-                    vars.add(var)
-                    body.append(var)
-            prods.add(Production(head, body))
+        if contains_regexes:
+            for line in text:
+                raw_head, *raw_body = line.strip().split(' ', 1)
+                regex = Regex(' '.join(raw_body))
+                head = Variable(raw_head)
+                if start_var is None:
+                    start_var = head
+                cur_cfg = cls._create_cfg_from_regex(head, regex)
+                vars.update(cur_cfg.variables)
+                terms.update(cur_cfg.terminals)
+                prods.update(cur_cfg.productions)
+        else:
+            for line in text:
+                raw_head, *raw_body = line.strip().split()
+                if start_var is None:
+                    start_var = Variable(raw_head)
+                head = Variable(raw_head)
+                vars.add(head)
+                body = []
+                for element in raw_body:
+                    if element == 'eps':
+                        continue
+                    elif element.islower():
+                        term = Terminal(element)
+                        terms.add(term)
+                        body.append(term)
+                    elif any(letter.isupper() for letter in element):
+                        var = Variable(element)
+                        vars.add(var)
+                        body.append(var)
+                prods.add(Production(head, body))
         cfg = CFG(vars, terms, start_var, prods)
         return cls(cfg)
 
     @classmethod
-    def from_file(cls, path_to_file: str):
+    def from_file(cls, path_to_file: str, contains_regexes=False):
         with open(path_to_file, 'r') as file:
-            return cls.from_text(file.readlines())
+            return cls.from_text(file.readlines(), contains_regexes)
 
-    def __calculate_rfa(self):
-        rfa = wrappers.GraphWrapper.empty()
-        rfa.matrix_size = sum([len(prod.body) + 1 for prod in self.cfg.productions])
-        empty_matrix = Matrix.sparse(types.BOOL, rfa.matrix_size, rfa.matrix_size)
-        production_by_vertices, cnt = {}, 0
-        for prod in self.cfg.productions:
-            rfa.start_states.add(cnt)
-            production_by_vertices[cnt, cnt + len(prod.body)] = prod
-            for var in prod.body:
-                matrix = rfa.label_to_bool_matrix.setdefault(var.value, empty_matrix.dup())
-                matrix[cnt, cnt + 1] = True
-                cnt += 1
-            rfa.final_states.add(cnt)
-            cnt += 1
-        return rfa, production_by_vertices
+    @classmethod
+    def _create_cfg_from_regex(cls, head: Variable, regex: Regex) -> CFG:
+        dfa = regex.to_epsilon_nfa().to_deterministic().minimize()
+        transitions = dfa._transition_function._transitions
+        state_to_var: Dict[State, Variable] = {}
+        productions, terms, vars = set(), set(), set()
+        for state in dfa.states:
+            state_to_var[state] = Variable(f'{state}:{cls.__var_state_counter}')
+            cls.__var_state_counter += 1
+        vars.update(state_to_var.values())
+        for start_state in dfa.start_states:
+            productions.add(Production(head, [state_to_var[start_state]]))
+        for state_from in transitions:
+            for edge_symb in transitions[state_from]:
+                state_to = transitions[state_from][edge_symb]
+                current_prod_head = state_to_var[state_from]
+                current_prod_body = []
+                if edge_symb.value != 'eps' and edge_symb.value.islower():
+                    term = Terminal(edge_symb.value)
+                    terms.add(term)
+                    current_prod_body.append(term)
+                elif any(letter.isupper() for letter in edge_symb.value):
+                    var = Variable(edge_symb.value)
+                    vars.add(var)
+                    current_prod_body.append(var)
+                current_prod_body.append(state_to_var[state_to])
+                productions.add(Production(current_prod_head, current_prod_body))
+                if state_to in dfa.final_states:
+                    productions.add(Production(state_to_var[state_to], []))
+        if not productions:
+            return CFG(vars, terms, head, {Production(head, [])})
+        return CFG(vars, terms, head, productions)
+
+    def get_weak_cnf(self) -> CFG:
+        wcnf = self.cnf
+        if self.generate_epsilon:
+            new_start_symbol = Variable("S'")
+            new_variables = set(wcnf.variables)
+            new_variables.add(new_start_symbol)
+            new_productions = set(wcnf.productions)
+            new_productions.add(Production(new_start_symbol, [wcnf.start_symbol]))
+            new_productions.add(Production(new_start_symbol, []))
+            return CFG(new_variables, wcnf.terminals, new_start_symbol, new_productions)
+        return wcnf
 
     def accepts(self, word: str) -> bool:
         size = len(word)
