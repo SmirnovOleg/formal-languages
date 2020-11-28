@@ -49,14 +49,14 @@ def suite(request):
 
 def test_cfpq_without_regexes(suite):
     graph, algo, expected = suite['graph'], suite['algo'], suite['expected']
-    grammar = GrammarWrapper.from_text(suite['grammar_source_text'], contains_regexes=False)
+    grammar = GrammarWrapper.from_text(suite['grammar_source_text'])
     solver = graph.__getattribute__(f'cfpq_{algo}')
     assert solver(grammar) == expected
 
 
 def test_cfpq_with_regexes(suite):
     graph, algo, expected = suite['graph'], suite['algo'], suite['expected']
-    grammar = GrammarWrapper.from_text(suite['grammar_source_text'], contains_regexes=True)
+    grammar = GrammarWrapper.from_text(suite['grammar_source_text'])
     solver = graph.__getattribute__(f'cfpq_{algo}')
     assert solver(grammar) == expected
 
