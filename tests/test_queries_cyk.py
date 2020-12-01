@@ -24,7 +24,7 @@ variables = {
     'OTHER_PATTERN', 'ANOTHER_PATTERN', 'USER_EPS', 'NON_TERM', 'TAIL'
 }
 
-grammar = GrammarWrapper.from_file(os.path.join(os.getcwd(), 'query_language_grammar.txt'),
+grammar = GrammarWrapper.from_file(os.path.join(os.getcwd(), 'grammar.txt'),
                                    use_python_regexes_if_necessary=True,
                                    variables=variables)
 
