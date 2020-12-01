@@ -100,7 +100,7 @@ fragment LOWERCASE : [a-z] ;
 fragment UPPERCASE : [A-Z] ;
 fragment DIGIT : [0-9] ;
 
+INT: '0' | [1-9] DIGIT* ;
 STRING: ('_' | '.' | LOWERCASE | UPPERCASE) ('_' | '.' | LOWERCASE | UPPERCASE | DIGIT)* ;
 PATH: ('/' | '_' | '.' | LOWERCASE | UPPERCASE | DIGIT)+ ;
-INT: '0' | [1-9] DIGIT* ;
 WS : [ \t\r\n]+ -> skip ;
