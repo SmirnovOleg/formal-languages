@@ -50,3 +50,7 @@ fabric.properties
 tests/.big_data
 tests/big_cfpq_data
 .ipynb_checkpoints/
+
+antlr/
+!antlr/QueryLanguageGrammar.g4
+test_script.txt
