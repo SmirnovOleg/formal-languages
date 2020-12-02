@@ -19,7 +19,7 @@
 -- Connect to the particular database (folder with graphs)
 <b>STMT -> connect " PATH "</b>
 -- Add new production to the global grammar
-<b>STMT -> production VAR to PATTERN</b>
+<b>STMT -> production NON_TERM to PATTERN</b>
 -- Calculate select query with some constraints
 <b>STMT -> select OBJECTIVE from GRAPH</b>
 
